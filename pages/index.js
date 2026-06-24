@@ -403,7 +403,7 @@ export default function Dashboard() {
                   'Every recommended position is a defined-risk spread — the maximum loss is known and capped before entry, regardless of how far the market moves against it.',
                   'No naked option selling is ever recommended by this system, by design — this directly satisfies the "no naked directional bets" requirement.',
                   'When the composite score sits inside ±30 (the "neutral" zone), the system explicitly recommends no trade rather than forcing a directional pick — this is the single highest-value rule in the whole system, validated by the 23 Jun miss above being a "skip" rather than a wrong directional call.',
-                  'No system can predict a genuine black swan (war, central bank surprise, flash crash) by definition. What this system does instead is guarantee that any single day's loss is bounded and known in advance — that is the honest, achievable version of "black swan mitigation."',
+                  'No system can predict a genuine black swan (war, central bank surprise, flash crash) by definition. What this system does instead is guarantee that any single day\'s loss is bounded and known in advance — that is the honest, achievable version of "black swan mitigation."',
                 ].map((t, i) => (
                   <div key={i} style={{ fontSize: 12, color: '#5F5E5A', lineHeight: 1.6, padding: '6px 0', borderBottom: i < 3 ? '0.5px solid #F1EFE8' : 'none' }}>{t}</div>
                 ))}
