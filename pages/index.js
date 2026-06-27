@@ -1,46 +1,57 @@
 import { useState, useEffect, useCallback } from 'react'
 import Head from 'next/head'
 import { MODEL_VERSION, MODEL_CHANGELOG, PREDICTION_LOG, getAccuracyStats, build325Strategy } from '../lib/learning'
-import { MCX_COMMODITIES, MCX_BACKTEST, USD_INR, getMCXAccuracyStats } from '../lib/mcx'
-
-// ─────────────────────────────────────────────────────────────────────────────
-// REFERENCE DATA — verified 25/27 Jun 2026. See docs/SCOPE_AND_HONESTY.md.
-// Today is Sat 27 Jun 2026. Markets closed Fri 26 Jun (Muharram holiday).
-// Most recent close: Thu 25 Jun, NIFTY 24,056.00 (+0.14%). Next session: Mon.
-// ─────────────────────────────────────────────────────────────────────────────
+import { MCX_COMMODITIES, MCX_BACKTEST, USD_INR, getMCXAccuracyStats, getTradableCommodities } from '../lib/mcx'
+import { buildStrategies } from '../lib/strategy'
+import { buildEvidenceChain, CURRENT_OI_SNAPSHOT } from '../lib/oiSignals'
+import { buildHorizons } from '../lib/horizons'
 
 const FALLBACK_DATA = {
   asOf: '25 Jun 2026 close (fallback — Fri 26 Jun was a market holiday)',
   niftyClose: 24056.00,
   niftyPrev: 24021.65,
-  niftyOpen25: 24125.85,
   vix: 13.05,
   vixPrev: 13.94,
-  pcr: 1.02,
+  pcr: 1.177,
   fiiNet: -1541.08,
   diiNet: 2715.17,
-  crudePct: -1.0,
-  catalystNote: 'Iran-US Switzerland peace talks (Day 5) outcome over the long weekend is the dominant swing factor',
-  support: 24020,
+  crudePct: -3.74,
+  catalystNote: 'Iran-US Switzerland talks easing; "mostly agreed" terms reported by Axios/White House officials',
+  support: 24000,
   resistance: 24200,
-  maxPain: 24000,
+  maxPain: 24100,
   isLive: false,
   isWeekendGap: true,
   nextSessionLabel: 'Monday 29 Jun 2026',
   gapDays: 3,
 }
 
+const GLOBAL_INDICES = [
+  { label: 'S&P 500', value: 7354.02, chgPct: -0.05, region: 'US' },
+  { label: 'Dow Jones', value: 51876.11, chgPct: -0.09, region: 'US' },
+  { label: 'Nasdaq', value: 25297.62, chgPct: -0.24, region: 'US' },
+  { label: 'Russell 2000', value: 3010.08, chgPct: 0.07, region: 'US' },
+  { label: 'Nikkei 225', value: 69360.88, chgPct: -4.15, region: 'Asia' },
+  { label: 'Hang Seng', value: 22671.86, chgPct: -1.76, region: 'Asia' },
+  { label: 'Shanghai CSI 300', value: 4892.12, chgPct: -0.45, region: 'Asia' },
+  { label: 'FTSE 100', value: 10508.02, chgPct: -0.21, region: 'Europe' },
+  { label: 'DAX', value: 24671.22, chgPct: -1.29, region: 'Europe' },
+  { label: 'CAC 40', value: 8384.87, chgPct: -0.55, region: 'Europe' },
+  { label: 'CBOE VIX (US)', value: 18.41, chgPct: -2.54, region: 'Vol' },
+  { label: 'India VIX', value: 13.05, chgPct: -2.54, region: 'Vol' },
+]
+
 const FACTOR_META = {
-  'Realized trend':     { icon: 'ti-trending-up',      ramp: 'blue' },
-  'India VIX':          { icon: 'ti-activity',          ramp: 'purple' },
-  'PCR (fresh series)': { icon: 'ti-chart-donut',        ramp: 'coral' },
-  'Crude oil (Brent)':  { icon: 'ti-droplet',            ramp: 'coral' },
-  'FII / DII flow':     { icon: 'ti-building-bank',      ramp: 'green' },
-  'Catalyst flag':      { icon: 'ti-news',               ramp: 'pink' },
+  'Realized trend':     { icon: 'ti-trending-up', ramp: 'blue' },
+  'India VIX':          { icon: 'ti-activity', ramp: 'purple' },
+  'PCR (fresh series)': { icon: 'ti-chart-donut', ramp: 'coral' },
+  'Crude oil (Brent)':  { icon: 'ti-droplet', ramp: 'coral' },
+  'FII / DII flow':     { icon: 'ti-building-bank', ramp: 'green' },
+  'Catalyst flag':      { icon: 'ti-news', ramp: 'pink' },
   'Weekend gap flag':   { icon: 'ti-calendar-exclamation', ramp: 'amber' },
 }
 
-function computeScoreV4(d) {
+function computeScoreV5(d) {
   const factors = []
   let score = 0
 
@@ -84,44 +95,30 @@ function computeScoreV4(d) {
   return { total, direction, confidence, factors, dampened }
 }
 
-const REAL_PREMIUMS_FALLBACK = { '24000_CE': 25.05, '24300_CE': 12.0, '23800_PE': 28.55, '23700_PE': 14.0 }
-
-function buildTrade(direction, d) {
-  if (direction === 'NEUTRAL') {
-    return { skip: true, reason: 'Composite score within ±30 — no directional edge. Stand aside or run a small defined-risk iron condor.' }
-  }
-  const bull = direction === 'BULL'
-  const sellStrike = bull ? d.support : d.resistance
-  const buyStrike = bull ? d.support - 300 : d.resistance + 300
-  const inst = bull ? 'PE' : 'CE'
-  const sellPrem = bull ? REAL_PREMIUMS_FALLBACK['23800_PE'] : REAL_PREMIUMS_FALLBACK['24300_CE']
-  const buyPrem = bull ? REAL_PREMIUMS_FALLBACK['23700_PE'] : 6.0
-  const netCredit = +(sellPrem - buyPrem).toFixed(2)
-  const lot = 75
-  const maxProfit = Math.round(netCredit * lot)
-  const spreadWidth = Math.abs(sellStrike - buyStrike)
-  const maxLoss = Math.round((spreadWidth - netCredit) * lot)
-  return {
-    skip: false,
-    strategy: bull ? 'Bull put spread (credit)' : 'Bear call spread (credit)',
-    sellStrike, buyStrike, inst, sellPrem, buyPrem, netCredit, lot, maxProfit, maxLoss, spreadWidth,
-    breakeven: bull ? sellStrike - netCredit : sellStrike + netCredit,
-    pop: bull ? 64 : 58,
-    winLossRatio: +(maxProfit / maxLoss).toFixed(2),
-  }
+const RAMPS = {
+  blue:   { 50: '#E6F1FB', 100: '#B5D4F4', 600: '#185FA5', 800: '#0C447C' },
+  green:  { 50: '#EAF3DE', 100: '#C0DD97', 600: '#3B6D11', 800: '#27500A' },
+  red:    { 50: '#FCEBEB', 100: '#F7C1C1', 600: '#A32D2D', 800: '#791F1F' },
+  amber:  { 50: '#FAEEDA', 100: '#FAC775', 600: '#854F0B', 800: '#633806' },
+  purple: { 50: '#EEEDFE', 100: '#CECBF6', 600: '#534AB7', 800: '#3C3489' },
+  coral:  { 50: '#FAECE7', 100: '#F5C4B3', 600: '#993C1D', 800: '#712B13' },
+  pink:   { 50: '#FBEAF0', 100: '#F4C0D1', 600: '#993556', 800: '#72243E' },
+  gray:   { 50: '#F1EFE8', 100: '#D3D1C7', 600: '#5F5E5A', 800: '#444441' },
 }
 
-// ─── UI PRIMITIVES (design-system tokens) ────────────────────────────────────
-
-const RAMPS = {
-  blue:   { 50: '#E6F1FB', 600: '#185FA5', 800: '#0C447C' },
-  green:  { 50: '#EAF3DE', 600: '#3B6D11', 800: '#27500A' },
-  red:    { 50: '#FCEBEB', 600: '#A32D2D', 800: '#791F1F' },
-  amber:  { 50: '#FAEEDA', 600: '#854F0B', 800: '#633806' },
-  purple: { 50: '#EEEDFE', 600: '#534AB7', 800: '#3C3489' },
-  coral:  { 50: '#FAECE7', 600: '#993C1D', 800: '#712B13' },
-  pink:   { 50: '#FBEAF0', 600: '#993556', 800: '#72243E' },
-  gray:   { 50: '#F1EFE8', 600: '#5F5E5A', 800: '#444441' },
+function heatColor(chgPct) {
+  const a = Math.min(Math.abs(chgPct) / 4, 1)
+  if (chgPct > 0.05) {
+    if (a > 0.6) return { bg: '#97C459', fg: '#173404' }
+    if (a > 0.25) return { bg: '#C0DD97', fg: '#27500A' }
+    return { bg: '#EAF3DE', fg: '#3B6D11' }
+  }
+  if (chgPct < -0.05) {
+    if (a > 0.6) return { bg: '#E24B4A', fg: '#501313' }
+    if (a > 0.25) return { bg: '#F09595', fg: '#791F1F' }
+    return { bg: '#FCEBEB', fg: '#A32D2D' }
+  }
+  return { bg: '#F1EFE8', fg: '#5F5E5A' }
 }
 
 function Pill({ text, ramp }) {
@@ -140,10 +137,13 @@ function Card({ children, style, ramp }) {
   )
 }
 
-function SectionLabel({ children, icon }) {
+function SectionLabel({ children, icon, sub }) {
   return (
-    <div style={{ fontSize: 11, fontWeight: 500, color: '#888780', letterSpacing: '.05em', textTransform: 'uppercase', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-      {icon && <i className={`ti ${icon}`} style={{ fontSize: 13 }} aria-hidden="true" />}{children}
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ fontSize: 11, fontWeight: 500, color: '#888780', letterSpacing: '.05em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 6 }}>
+        {icon && <i className={`ti ${icon}`} style={{ fontSize: 13 }} aria-hidden="true" />}{children}
+      </div>
+      {sub && <div style={{ fontSize: 11, color: '#888780', marginTop: 2 }}>{sub}</div>}
     </div>
   )
 }
@@ -182,8 +182,6 @@ function FactorRow({ f, isLast }) {
 
 function toneRamp(dir) { return dir === 'BULL' ? 'green' : dir === 'BEAR' ? 'red' : 'gray' }
 function convRamp(c) { return c === 'HIGH' ? 'amber' : c === 'MED' ? 'blue' : 'gray' }
-
-// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 export default function Dashboard() {
   const [tab, setTab] = useState('nifty-home')
@@ -225,17 +223,20 @@ export default function Dashboard() {
     pcr: ocLive?.ok && ocLive.data.pcr != null ? ocLive.data.pcr : FALLBACK_DATA.pcr,
   }
 
-  const RESULT = computeScoreV4(data)
-  const TRADE = buildTrade(RESULT.direction, data)
+  const RESULT = computeScoreV5(data)
+  const STRATEGIES = buildStrategies(RESULT.direction, RESULT.confidence, data)
   const STRAT325 = build325Strategy(RESULT.direction, data.niftyClose, RESULT.confidence)
+  const HORIZONS = buildHorizons(RESULT.total, RESULT.direction, RESULT.confidence, data)
+  const EVIDENCE = buildEvidenceChain(data)
   const stats = getAccuracyStats(PREDICTION_LOG)
   const mcxStats = getMCXAccuracyStats()
+  const { tradable, watchOnly } = getTradableCommodities(MCX_COMMODITIES)
 
   const NAV = [
     { k: 'nifty-home', label: 'NIFTY', icon: 'ti-chart-candle' },
     { k: 'mcx-home', label: 'MCX', icon: 'ti-coin' },
-    { k: 'nifty-history', label: 'NIFTY · 30-day', icon: 'ti-history' },
-    { k: 'mcx-history', label: 'MCX · 30-day', icon: 'ti-history' },
+    { k: 'nifty-history', label: 'NIFTY · 30-day', icon: 'ti-table' },
+    { k: 'mcx-history', label: 'MCX · 30-day', icon: 'ti-table' },
     { k: 'playbook', label: 'Playbook', icon: 'ti-bulb' },
   ]
 
@@ -250,7 +251,7 @@ export default function Dashboard() {
       <div style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', background: '#F7F6F3', minHeight: '100vh', paddingBottom: '3rem' }}>
 
         <div style={{ background: '#fff', borderBottom: '0.5px solid #E5E3DC', position: 'sticky', top: 0, zIndex: 50 }}>
-          <div style={{ maxWidth: 1040, margin: '0 auto', padding: '0 1.5rem', display: 'flex', alignItems: 'center', height: 58, gap: 18 }}>
+          <div style={{ maxWidth: 1080, margin: '0 auto', padding: '0 1.5rem', display: 'flex', alignItems: 'center', height: 58, gap: 18 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
               <div style={{ width: 32, height: 32, borderRadius: 9, background: RAMPS[toneRamp(RESULT.direction)][600], display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <i className={`ti ${RESULT.direction === 'BULL' ? 'ti-trending-up' : RESULT.direction === 'BEAR' ? 'ti-trending-down' : 'ti-minus'}`} style={{ fontSize: 18, color: '#fff' }} aria-hidden="true" />
@@ -275,7 +276,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div style={{ maxWidth: 1040, margin: '0 auto', padding: '1.4rem 1.5rem' }}>
+        <div style={{ maxWidth: 1080, margin: '0 auto', padding: '1.4rem 1.5rem' }}>
 
           <div style={{
             background: data.isLive ? RAMPS.green[50] : RAMPS.amber[50],
@@ -295,10 +296,10 @@ export default function Dashboard() {
           </div>
 
           {tab === 'nifty-home' && (
-            <NiftyHome data={data} RESULT={RESULT} TRADE={TRADE} STRAT325={STRAT325} />
+            <NiftyHome data={data} RESULT={RESULT} STRATEGIES={STRATEGIES} STRAT325={STRAT325} HORIZONS={HORIZONS} EVIDENCE={EVIDENCE} />
           )}
 
-          {tab === 'mcx-home' && <MCXHome />}
+          {tab === 'mcx-home' && <MCXHome tradable={tradable} watchOnly={watchOnly} />}
 
           {tab === 'nifty-history' && <NiftyHistory stats={stats} />}
 
@@ -312,20 +313,9 @@ export default function Dashboard() {
   )
 }
 
-function NiftyHome({ data, RESULT, TRADE, STRAT325 }) {
+function NiftyHome({ data, RESULT, STRATEGIES, STRAT325, HORIZONS, EVIDENCE }) {
   const ramp = toneRamp(RESULT.direction)
   const r = RAMPS[ramp]
-
-  const GLOBAL = [
-    { label: 'S&P 500', value: '7,357.49', chg: '−0.01%', ramp: 'gray' },
-    { label: 'Dow Jones', value: '51,920.62', chg: '+0.14%', ramp: 'green' },
-    { label: 'Nasdaq', value: '25,358.60', chg: '−0.46%', ramp: 'red' },
-    { label: 'Nikkei 225', value: '69,360.88', chg: '−4.15%', ramp: 'red' },
-    { label: 'Shanghai', value: '4,027.27', chg: '−2.26%', ramp: 'red' },
-    { label: 'GIFT Nifty', value: '24,071–24,091', chg: 'flat/thin', ramp: 'gray' },
-    { label: 'India VIX', value: data.vix.toFixed(2), chg: 'multi-week low', ramp: 'green' },
-    { label: 'USD/INR', value: USD_INR.toFixed(2), chg: '—', ramp: 'gray' },
-  ]
 
   return (
     <>
@@ -346,99 +336,139 @@ function NiftyHome({ data, RESULT, TRADE, STRAT325 }) {
         </div>
       </Card>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: '1.1rem' }}>
-        <Metric label="Last close (Thu 25 Jun)" value={data.niftyClose.toLocaleString()} ramp="blue" />
-        <Metric label="Support" value={data.support.toLocaleString()} ramp="green" />
-        <Metric label="Resistance" value={data.resistance.toLocaleString()} ramp="red" />
-        <Metric label="Max pain" value={data.maxPain.toLocaleString()} ramp="purple" />
+      <SectionLabel icon="ti-world" sub="Color intensity scales with magnitude of move — darker means a stronger signal in that direction">Global indices heatmap (overnight)</SectionLabel>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 7, marginBottom: '1.1rem' }}>
+        {GLOBAL_INDICES.map(g => {
+          const hc = heatColor(g.chgPct)
+          return (
+            <div key={g.label} style={{ background: hc.bg, borderRadius: 9, padding: '10px 12px' }}>
+              <div style={{ fontSize: 10.5, color: hc.fg, opacity: 0.85, marginBottom: 2 }}>{g.label}</div>
+              <div style={{ fontSize: 14, fontWeight: 500, color: hc.fg }}>{g.value.toLocaleString()}</div>
+              <div style={{ fontSize: 11, fontWeight: 500, color: hc.fg }}>{g.chgPct > 0 ? '+' : ''}{g.chgPct}%</div>
+            </div>
+          )
+        })}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: 12, marginBottom: '1.1rem' }}>
+      <SectionLabel icon="ti-calendar-stats" sub="Your trade log shows longer holds win far more than next-day entries — these three horizons make that visible side by side">Forecast across time horizons</SectionLabel>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: '1.1rem' }}>
+        {HORIZONS.map(h => (
+          <Card key={h.id} ramp={toneRamp(h.direction)}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>{h.label}</div>
+                <div style={{ fontSize: 10.5, color: '#888780' }}>{h.window}</div>
+              </div>
+              <Pill text={h.direction} ramp={toneRamp(h.direction)} />
+            </div>
+            <div style={{ fontSize: 17, fontWeight: 500, marginBottom: 4 }}>{h.range[0].toLocaleString()}–{h.range[1].toLocaleString()}</div>
+            <Pill text={`${h.confidence} confidence`} ramp={convRamp(h.confidence)} />
+            <div style={{ fontSize: 11, color: '#5F5E5A', lineHeight: 1.55, marginTop: 8 }}>{h.rationale}</div>
+            <div style={{ fontSize: 10.5, color: '#888780', marginTop: 6, fontStyle: 'italic' }}>{h.historicalWinRate}</div>
+          </Card>
+        ))}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: '1.1rem' }}>
         <Card>
           <SectionLabel icon="ti-list-check">Why — signal breakdown</SectionLabel>
           {RESULT.factors.map((f, i) => <FactorRow key={f.name} f={f} isLast={i === RESULT.factors.length - 1} />)}
         </Card>
 
         <Card>
-          <SectionLabel icon="ti-world">Global markets &amp; news driving this call</SectionLabel>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, marginBottom: 12 }}>
-            {GLOBAL.map(g => (
-              <div key={g.label} style={{ background: RAMPS[g.ramp][50], borderRadius: 8, padding: '8px 10px' }}>
-                <div style={{ fontSize: 10, color: RAMPS[g.ramp][600], opacity: 0.85 }}>{g.label}</div>
-                <div style={{ fontSize: 13, fontWeight: 500, color: RAMPS[g.ramp][800] }}>{g.value}</div>
-                <div style={{ fontSize: 10, color: RAMPS[g.ramp][600] }}>{g.chg}</div>
+          <SectionLabel icon="ti-fingerprint" sub="Named, sourced evidence points — not a vague pattern claim">Evidence chain</SectionLabel>
+          {EVIDENCE.map((e, i) => (
+            <div key={i} style={{ padding: '9px 0', borderBottom: i < EVIDENCE.length - 1 ? '0.5px solid #F1EFE8' : 'none' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7 }}>
+                <i className="ti ti-point-filled" style={{ fontSize: 9, color: RAMPS.purple[600], marginTop: 5, flexShrink: 0 }} aria-hidden="true" />
+                <div>
+                  <div style={{ fontSize: 12.5, fontWeight: 500 }}>{e.dot}</div>
+                  <div style={{ fontSize: 11.5, color: '#5F5E5A', lineHeight: 1.5, marginTop: 1 }}>{e.reading}</div>
+                  <div style={{ fontSize: 10, color: '#B4B2A9', marginTop: 1 }}>Source: {e.source}</div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </Card>
+      </div>
+
+      <Card style={{ marginBottom: '1.1rem' }}>
+        <SectionLabel icon="ti-layers-intersect" sub={`PCR ${CURRENT_OI_SNAPSHOT.pcr} · Max pain ${CURRENT_OI_SNAPSHOT.maxPain.toLocaleString()} · As of ${CURRENT_OI_SNAPSHOT.asOf}`}>Option chain OI map</SectionLabel>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 7 }}>
+          {CURRENT_OI_SNAPSHOT.strikes.map(s => {
+            const isATM = Math.abs(s.strike - CURRENT_OI_SNAPSHOT.spot) < 60
+            return (
+              <div key={s.strike} style={{ background: isATM ? RAMPS.amber[50] : '#F7F6F3', borderRadius: 8, padding: '8px 9px', textAlign: 'center' }}>
+                <div style={{ fontSize: 12, fontWeight: 500 }}>{s.strike.toLocaleString()}</div>
+                <div style={{ fontSize: 9.5, color: RAMPS.red[600], marginTop: 3 }}>Call: {s.callOI}</div>
+                <div style={{ fontSize: 9.5, color: RAMPS.green[600] }}>Put: {s.putOI}</div>
+                <div style={{ fontSize: 9, color: '#888780', marginTop: 3, lineHeight: 1.3 }}>{s.note}</div>
+              </div>
+            )
+          })}
+        </div>
+      </Card>
+
+      <SectionLabel icon="ti-target-arrow" sub="Ranked so you can see the real tradeoff: higher win-rate structures have a worse payoff ratio, and vice versa">Trade structures — ranked by win-size vs loss-size ratio</SectionLabel>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: '1.1rem' }}>
+        {STRATEGIES.filter(s => !s.skip).sort((a, b) => b.ratio - a.ratio).map(s => (
+          <Card key={s.id} ramp={s.isPrimary ? 'amber' : undefined} style={s.isPrimary ? { borderWidth: 2 } : {}}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 500 }}>{s.name}</div>
+              {s.isPrimary && <Pill text="recommended today" ramp="amber" />}
+            </div>
+            <div style={{ fontSize: 10.5, color: '#888780', marginBottom: 8 }}>{s.shape}</div>
+            {s.legs.map((l, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, padding: '2px 0' }}>
+                <span><Pill text={l.action} ramp={l.action === 'BUY' ? 'green' : 'red'} /> {l.strike.toLocaleString()} {l.inst}</span>
+                <span style={{ color: '#888780' }}>₹{l.premium}</span>
               </div>
             ))}
-          </div>
-          <div style={{ background: RAMPS.pink[50], borderRadius: 8, padding: '9px 11px', fontSize: 11.5, color: RAMPS.pink[800], lineHeight: 1.6, display: 'flex', gap: 7 }}>
-            <i className="ti ti-alert-triangle" style={{ fontSize: 14, marginTop: 1, flexShrink: 0 }} aria-hidden="true" />
-            <span><strong>Dominant swing factor:</strong> Iran–US Switzerland talks (Day 5) outcome over the long weekend. A confirmed deal pushes GIFT Nifty toward 24,300; a breakdown drops it below 23,900. This is unresolved as of Friday close — check news first thing Monday before acting on this forecast.</span>
-          </div>
-        </Card>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 8, marginBottom: 8 }}>
+              <Metric label="Max profit" value={`₹${s.maxProfit.toLocaleString()}`} ramp="green" />
+              <Metric label="Max loss" value={`₹${s.maxLoss.toLocaleString()}`} ramp="red" />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, marginBottom: 6 }}>
+              <span style={{ color: '#888780' }}>Ratio</span>
+              <strong>{s.ratio}x {s.ratio > 1 ? '(profit > loss)' : '(loss > profit)'}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, marginBottom: 8 }}>
+              <span style={{ color: '#888780' }}>Est. probability of profit</span>
+              <strong>{s.popPct}%</strong>
+            </div>
+            <div style={{ fontSize: 11, color: '#5F5E5A', lineHeight: 1.6, marginBottom: 6 }}>{s.rationale}</div>
+            <div style={{ fontSize: 10.5, color: RAMPS.blue[600], background: RAMPS.blue[50], borderRadius: 6, padding: '6px 8px', lineHeight: 1.5 }}>{s.monthlyMathNote}</div>
+          </Card>
+        ))}
       </div>
 
-      <SectionLabel icon="ti-clock-play">Strategies to place by 3:30 PM — ranked by win:loss ratio</SectionLabel>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: '1.1rem' }}>
-
-        <Card ramp="green">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <span style={{ fontSize: 14, fontWeight: 500 }}>{TRADE.skip ? 'Credit spread' : TRADE.strategy}</span>
-            {!TRADE.skip && <Pill text={`win:loss 1 : ${(1/TRADE.winLossRatio).toFixed(2)}`} ramp="green" />}
-          </div>
-          {TRADE.skip ? (
-            <div style={{ fontSize: 13, color: '#5F5E5A', lineHeight: 1.7 }}>{TRADE.reason}</div>
-          ) : (
-            <>
-              {[
-                ['Sell leg', `${TRADE.sellStrike.toLocaleString()} ${TRADE.inst} @ ₹${TRADE.sellPrem.toFixed(2)}`],
-                ['Buy leg (hedge)', `${TRADE.buyStrike.toLocaleString()} ${TRADE.inst} @ ₹${TRADE.buyPrem.toFixed(2)}`],
-                ['Net credit', `₹${TRADE.netCredit.toFixed(2)}/unit`],
-                ['Max profit', `₹${TRADE.maxProfit.toLocaleString()}`],
-                ['Max loss', `₹${TRADE.maxLoss.toLocaleString()}`],
-                ['POP (est.)', `${TRADE.pop}%`],
-              ].map(([k, v]) => (
-                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 12 }}>
-                  <span style={{ color: '#888780' }}>{k}</span><span style={{ fontWeight: 500 }}>{v}</span>
-                </div>
-              ))}
-              <div style={{ fontSize: 11, color: '#888780', marginTop: 8 }}>Defined-risk, theta-positive. Place by 3:30 PM, hold through expiry or close at 60–70% of max profit.</div>
-            </>
-          )}
-        </Card>
-
-        <Card ramp="amber">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <span style={{ fontSize: 14, fontWeight: 500 }}>{STRAT325.skip ? '3:25 PM directional' : `${STRAT325.strike.toLocaleString()} ${STRAT325.inst} — single leg`}</span>
-            {!STRAT325.skip && <Pill text={`up to 1 : ${STRAT325.riskRewardAt3x}`} ramp="amber" />}
-          </div>
-          {STRAT325.skip ? (
-            <div style={{ fontSize: 13, color: '#5F5E5A', lineHeight: 1.7 }}>{STRAT325.reason}</div>
-          ) : (
-            <>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 10 }}>
-                <Metric label="Entry" value={`₹${STRAT325.estPremium}`} ramp="blue" />
-                <Metric label="Stop (50%)" value={`₹${STRAT325.stopLossPremium}`} ramp="red" />
-                <Metric label="Max loss" value={`₹${STRAT325.maxLoss.toLocaleString()}`} ramp="red" />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
-                <Metric label="2x target" value={`+₹${STRAT325.profit2x.toLocaleString()}`} ramp="green" />
-                <Metric label="3x target" value={`+₹${STRAT325.profit3x.toLocaleString()}`} ramp="green" />
-              </div>
-              <div style={{ fontSize: 11, color: '#888780' }}>Higher variance by design — cut the loser fast at the 50% stop, let the winner run to 2x/3x. Enter 3:25–3:28 PM only.</div>
-            </>
-          )}
-        </Card>
-      </div>
+      <Card style={{ marginBottom: '1.1rem' }} ramp="amber">
+        <SectionLabel icon="ti-clock-play" sub="A fourth, separate structure — deliberately higher variance, by design">3:25 PM closing-window directional play</SectionLabel>
+        {STRAT325.skip ? (
+          <div style={{ fontSize: 13, color: '#5F5E5A', lineHeight: 1.7 }}>{STRAT325.reason}</div>
+        ) : (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6, marginBottom: 8 }}>
+              <Metric label="Strike" value={`${STRAT325.strike.toLocaleString()} ${STRAT325.inst}`} ramp="blue" />
+              <Metric label="Entry" value={`₹${STRAT325.estPremium}`} ramp="blue" />
+              <Metric label="Stop (50%)" value={`₹${STRAT325.stopLossPremium}`} ramp="red" />
+              <Metric label="2x target" value={`+₹${STRAT325.profit2x.toLocaleString()}`} ramp="green" />
+              <Metric label="3x target" value={`+₹${STRAT325.profit3x.toLocaleString()}`} ramp="green" />
+            </div>
+            <div style={{ fontSize: 11, color: '#888780' }}>Single-leg buy, not a spread. Enter 3:25–3:28 PM only. Cut the loser fast at the stop, let the winner run.</div>
+          </>
+        )}
+      </Card>
 
       <div style={{ background: RAMPS.blue[50], borderRadius: 10, padding: '0.85rem 1.1rem', fontSize: 12, color: RAMPS.blue[800], lineHeight: 1.65, display: 'flex', gap: 8 }}>
-        <i className="ti ti-target-arrow" style={{ fontSize: 16, marginTop: 1, flexShrink: 0 }} aria-hidden="true" />
-        <span><strong>Monthly P&amp;L logic:</strong> the credit spread above is the steady, high-frequency, small-win engine — it should win more often than it loses and keep the account compounding quietly. The 3:25 PM play is the asymmetric tail — most days it hits the stop and costs a small, known amount, but on the days direction is right, it pays for several stopped-out days at once. Running both together, sized so neither single loss is painful, is the actual route to a positive month — not picking one big winning trade.</span>
+        <i className="ti ti-info-circle" style={{ fontSize: 16, marginTop: 1, flexShrink: 0 }} aria-hidden="true" />
+        <span><strong>How to use the three trade structures above:</strong> they are the same view expressed at three different win-rate/payoff tradeoffs, not three independent recommendations to all take. The credit spread wins more often but loses more when wrong. The debit spreads win less often but the win pays for more than one loss. Running the amber-highlighted one as your default, sized so any single max loss is genuinely tolerable, is what survives a month where half your trades go against you.</span>
       </div>
     </>
   )
 }
 
-function MCXHome() {
+function MCXHome({ tradable, watchOnly }) {
   return (
     <>
       <Card style={{ marginBottom: '1.1rem', background: `linear-gradient(135deg, ${RAMPS.coral[50]}, #fff 70%)` }} ramp="coral">
@@ -448,41 +478,52 @@ function MCXHome() {
         </div>
       </Card>
 
-      <SectionLabel icon="ti-chart-candle">This week's predictions — five MCX commodities</SectionLabel>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 12, marginBottom: '1.1rem' }}>
-        {MCX_COMMODITIES.map(c => {
-          const ramp = c.trend === 'BEARISH' ? 'red' : c.trend === 'BULLISH' ? 'green' : 'gray'
-          return (
-            <Card key={c.symbol} ramp={ramp}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 9 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ width: 30, height: 30, borderRadius: 9, background: RAMPS[ramp][50], display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <i className={`ti ${c.icon}`} style={{ fontSize: 16, color: RAMPS[ramp][600] }} aria-hidden="true" />
-                  </span>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 500 }}>{c.name}</div>
-                    <div style={{ fontSize: 11, color: '#888780' }}>{c.spot.toLocaleString()} {c.unit}</div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
-                  <Pill text={c.trend} ramp={ramp} />
-                  <Pill text={`${c.conviction} conviction`} ramp={convRamp(c.conviction)} />
-                </div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, marginBottom: 8 }}>
-                <Metric label="Support" value={c.support.join(' / ')} ramp="green" />
-                <Metric label="Resistance" value={c.resistance.join(' / ')} ramp="red" />
-              </div>
-              <div style={{ fontSize: 11.5, color: '#5F5E5A', lineHeight: 1.6, marginBottom: 6 }}>{c.justification}</div>
-              <div style={{ fontSize: 10.5, color: '#888780', lineHeight: 1.5, display: 'flex', gap: 5 }}>
-                <i className="ti ti-shield-exclamation" style={{ fontSize: 12, marginTop: 1, flexShrink: 0 }} aria-hidden="true" />
-                <span>{c.risks}</span>
-              </div>
-            </Card>
-          )
-        })}
+      <SectionLabel icon="ti-target" sub="High-conviction only — these are where the dashboard recommends actually sizing a trade">Tradable this week ({tradable.length})</SectionLabel>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 12, marginBottom: '1.25rem' }}>
+        {tradable.map(c => <CommodityCard key={c.symbol} c={c} />)}
       </div>
+
+      {watchOnly.length > 0 && (
+        <>
+          <SectionLabel icon="ti-eye" sub="Lower conviction — tracked for context, not recommended for sizing a trade this week">Watch only ({watchOnly.length})</SectionLabel>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 12, opacity: 0.75 }}>
+            {watchOnly.map(c => <CommodityCard key={c.symbol} c={c} dimmed />)}
+          </div>
+        </>
+      )}
     </>
+  )
+}
+
+function CommodityCard({ c }) {
+  const ramp = c.trend === 'BEARISH' ? 'red' : c.trend === 'BULLISH' ? 'green' : 'gray'
+  return (
+    <Card ramp={ramp}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 9 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ width: 30, height: 30, borderRadius: 9, background: RAMPS[ramp][50], display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <i className={`ti ${c.icon}`} style={{ fontSize: 16, color: RAMPS[ramp][600] }} aria-hidden="true" />
+          </span>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 500 }}>{c.name}</div>
+            <div style={{ fontSize: 11, color: '#888780' }}>{c.spot.toLocaleString()} {c.unit}</div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
+          <Pill text={c.trend} ramp={ramp} />
+          <Pill text={`${c.conviction} conviction`} ramp={convRamp(c.conviction)} />
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, marginBottom: 8 }}>
+        <Metric label="Support" value={c.support.join(' / ')} ramp="green" />
+        <Metric label="Resistance" value={c.resistance.join(' / ')} ramp="red" />
+      </div>
+      <div style={{ fontSize: 11.5, color: '#5F5E5A', lineHeight: 1.6, marginBottom: 6 }}>{c.justification}</div>
+      <div style={{ fontSize: 10.5, color: '#888780', lineHeight: 1.5, display: 'flex', gap: 5 }}>
+        <i className="ti ti-shield-exclamation" style={{ fontSize: 12, marginTop: 1, flexShrink: 0 }} aria-hidden="true" />
+        <span>{c.risks}</span>
+      </div>
+    </Card>
   )
 }
 
@@ -493,8 +534,42 @@ function NiftyHistory({ stats }) {
         <Metric label="Accuracy" value={stats.accuracyPct != null ? `${stats.accuracyPct}%` : '—'} sub={`${stats.correct} of ${stats.total}`} ramp={stats.accuracyPct >= 60 ? 'green' : 'red'} />
         <Metric label="Hits" value={stats.correct} ramp="green" />
         <Metric label="Partial misses" value={stats.partial} sub="right direction, wrong size" ramp="amber" />
-        <Metric label="Full misses" value={stats.misses} sub="root cause below" ramp="red" />
+        <Metric label="Full misses" value={stats.misses} sub="root cause logged" ramp="red" />
       </div>
+
+      <Card style={{ marginBottom: '1.1rem' }}>
+        <SectionLabel icon="ti-table" sub="Direction, range, and trade outcome together — so you can see if the model AND the trade both worked">Daily prediction &amp; trade outcome log</SectionLabel>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid #E5E3DC' }}>
+                {['Date', 'Predicted', 'Range', 'Actual close', 'Result', 'Trade taken', 'Trade P&L'].map(h => (
+                  <th key={h} style={{ textAlign: 'left', padding: '7px 10px', color: '#888780', fontWeight: 500, fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.03em' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {PREDICTION_LOG.map((r, i) => {
+                const isHoliday = r.result === 'holiday'
+                const pnl = r.tradeOutcome?.pnl
+                return (
+                  <tr key={i} style={{ borderBottom: '0.5px solid #F1EFE8', opacity: isHoliday ? 0.55 : 1 }}>
+                    <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>{r.date}</td>
+                    <td style={{ padding: '8px 10px' }}>{isHoliday ? <span style={{ color: '#B4B2A9' }}>—</span> : <Pill text={r.predicted} ramp={toneRamp(r.predicted)} />}</td>
+                    <td style={{ padding: '8px 10px', color: '#888780', whiteSpace: 'nowrap' }}>{r.predictedRange ? `${r.predictedRange[0].toLocaleString()}–${r.predictedRange[1].toLocaleString()}` : '—'}</td>
+                    <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>{r.actualClose ? `${r.actualClose.toLocaleString()} (${r.actualChangePct > 0 ? '+' : ''}${r.actualChangePct}%)` : <span style={{ color: '#B4B2A9' }}>market closed</span>}</td>
+                    <td style={{ padding: '8px 10px' }}><Pill text={r.result.replace('_', ' ')} ramp={r.result === 'correct' ? 'green' : r.result === 'partial_miss' ? 'amber' : r.result === 'miss' ? 'red' : 'gray'} /></td>
+                    <td style={{ padding: '8px 10px', color: '#5F5E5A', maxWidth: 220 }}>{r.tradeOutcome?.recommended || '—'}</td>
+                    <td style={{ padding: '8px 10px', fontWeight: 500, color: pnl > 0 ? RAMPS.green[600] : pnl < 0 ? RAMPS.red[600] : '#888780' }}>
+                      {pnl != null ? (pnl === 0 ? '₹0' : `${pnl > 0 ? '+' : ''}₹${pnl.toLocaleString()}`) : '—'}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
 
       <Card style={{ marginBottom: '1.1rem' }} ramp="purple">
         <SectionLabel icon="ti-git-branch">Model changelog — how the system learns from every miss</SectionLabel>
@@ -512,34 +587,20 @@ function NiftyHistory({ stats }) {
       </Card>
 
       <Card>
-        <SectionLabel icon="ti-list-details">Prediction log — every session, predicted vs actual</SectionLabel>
-        {PREDICTION_LOG.map((r, i) => (
-          <div key={i} style={{ padding: '13px 0', borderBottom: i < PREDICTION_LOG.length - 1 ? '0.5px solid #F1EFE8' : 'none' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 7, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 12, color: '#888780', width: 78 }}>{r.date}</span>
-              <Pill text={r.predicted} ramp={toneRamp(r.predicted)} />
-              <span style={{ fontSize: 11, color: '#888780' }}>predicted {r.predictedRange[0].toLocaleString()}–{r.predictedRange[1].toLocaleString()}</span>
-              <i className="ti ti-arrow-right" style={{ fontSize: 12, color: '#888780' }} aria-hidden="true" />
-              <span style={{ fontSize: 12, fontWeight: 500 }}>closed {r.actualClose.toLocaleString()} ({r.actualChangePct > 0 ? '+' : ''}{r.actualChangePct}%)</span>
-              <div style={{ flex: 1 }} />
-              <Pill text={r.result.replace('_', ' ')} ramp={r.result === 'correct' ? 'green' : r.result === 'partial_miss' ? 'amber' : 'red'} />
-            </div>
-            {r.note && <div style={{ fontSize: 12, color: '#5F5E5A', lineHeight: 1.55, paddingLeft: 87 }}>{r.note}</div>}
-            {r.rootCause && (
-              <div style={{ background: RAMPS.red[50], borderRadius: 9, padding: '11px 13px', marginTop: 7 }}>
-                <div style={{ fontSize: 12, fontWeight: 500, color: RAMPS.red[800], marginBottom: 5, display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <i className="ti ti-alert-triangle" style={{ fontSize: 14 }} aria-hidden="true" />Root cause analysis
-                </div>
-                <div style={{ fontSize: 12, color: RAMPS.red[800], marginBottom: 6, lineHeight: 1.6 }}>{r.rootCause.summary}</div>
-                <div style={{ fontSize: 11.5, color: RAMPS.pink[800], marginBottom: 6, lineHeight: 1.6 }}><strong>Missed driver:</strong> {r.rootCause.driverMissed}</div>
-                {r.rootCause.whyEachSignalFailed.map((s, j) => (
-                  <div key={j} style={{ fontSize: 11, color: '#5F5E5A', marginLeft: 14, marginBottom: 3, lineHeight: 1.5 }}>• <strong>{s.signal}:</strong> {s.issue}</div>
-                ))}
-                <div style={{ fontSize: 12, color: RAMPS.green[800], background: RAMPS.green[50], borderRadius: 7, padding: '7px 9px', marginTop: 7, lineHeight: 1.55 }}>
-                  <i className="ti ti-tool" style={{ fontSize: 13, marginRight: 4 }} aria-hidden="true" /><strong>Fix applied:</strong> {r.rootCause.fixApplied}
-                </div>
+        <SectionLabel icon="ti-list-details" sub="Full detail for every miss and partial miss — kept below the table so the table stays scannable">Root cause detail</SectionLabel>
+        {PREDICTION_LOG.filter(r => r.rootCause).map((r, i) => (
+          <div key={i} style={{ padding: '12px 0', borderBottom: '0.5px solid #F1EFE8' }}>
+            <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 4 }}>{r.date}</div>
+            <div style={{ background: RAMPS.red[50], borderRadius: 9, padding: '11px 13px' }}>
+              <div style={{ fontSize: 12, color: RAMPS.red[800], marginBottom: 6, lineHeight: 1.6 }}>{r.rootCause.summary}</div>
+              <div style={{ fontSize: 11.5, color: RAMPS.pink[800], marginBottom: 6, lineHeight: 1.6 }}><strong>Missed driver:</strong> {r.rootCause.driverMissed}</div>
+              {r.rootCause.whyEachSignalFailed.map((s, j) => (
+                <div key={j} style={{ fontSize: 11, color: '#5F5E5A', marginLeft: 14, marginBottom: 3, lineHeight: 1.5 }}>• <strong>{s.signal}:</strong> {s.issue}</div>
+              ))}
+              <div style={{ fontSize: 12, color: RAMPS.green[800], background: RAMPS.green[50], borderRadius: 7, padding: '7px 9px', marginTop: 7, lineHeight: 1.55 }}>
+                <i className="ti ti-tool" style={{ fontSize: 13, marginRight: 4 }} aria-hidden="true" /><strong>Fix applied:</strong> {r.rootCause.fixApplied}
               </div>
-            )}
+            </div>
           </div>
         ))}
       </Card>
@@ -556,30 +617,47 @@ function MCXHistory({ mcxStats }) {
         <Metric label="Misses" value={mcxStats.misses} sub="root cause below" ramp="red" />
       </div>
 
+      <Card style={{ marginBottom: '1.1rem' }}>
+        <SectionLabel icon="ti-table">1-month backtest — predicted vs achieved levels, by commodity</SectionLabel>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid #E5E3DC' }}>
+                {['Week of', 'Commodity', 'Predicted', 'Target', 'Achieved', 'Result'].map(h => (
+                  <th key={h} style={{ textAlign: 'left', padding: '7px 10px', color: '#888780', fontWeight: 500, fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.03em' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {MCX_BACKTEST.map((r, i) => (
+                <tr key={i} style={{ borderBottom: '0.5px solid #F1EFE8' }}>
+                  <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>{r.weekOf}</td>
+                  <td style={{ padding: '8px 10px' }}><Pill text={r.symbol} ramp="gray" /></td>
+                  <td style={{ padding: '8px 10px' }}><Pill text={r.predictedDirection} ramp={toneRamp(r.predictedDirection)} /></td>
+                  <td style={{ padding: '8px 10px', color: '#888780' }}>{r.predictedLevel != null ? `~${r.predictedLevel}` : '—'}</td>
+                  <td style={{ padding: '8px 10px', fontWeight: 500 }}>{r.achievedLevel.toLocaleString()}</td>
+                  <td style={{ padding: '8px 10px' }}><Pill text={r.result} ramp={r.result === 'correct' ? 'green' : 'red'} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
       <Card>
-        <SectionLabel icon="ti-list-details">1-month backtest — predicted vs achieved levels</SectionLabel>
+        <SectionLabel icon="ti-list-details">Notes &amp; root causes for each row</SectionLabel>
         {MCX_BACKTEST.map((r, i) => (
-          <div key={i} style={{ padding: '13px 0', borderBottom: i < MCX_BACKTEST.length - 1 ? '0.5px solid #F1EFE8' : 'none' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 6, flexWrap: 'wrap' }}>
-              <Pill text={r.symbol} ramp="gray" />
-              <span style={{ fontSize: 12, color: '#888780' }}>week of {r.weekOf}</span>
-              <Pill text={r.predictedDirection} ramp={toneRamp(r.predictedDirection)} />
-              {r.predictedLevel != null && <span style={{ fontSize: 11, color: '#888780' }}>predicted ~{r.predictedLevel}</span>}
-              <i className="ti ti-arrow-right" style={{ fontSize: 12, color: '#888780' }} aria-hidden="true" />
-              <span style={{ fontSize: 12, fontWeight: 500 }}>achieved {r.achievedLevel.toLocaleString()}</span>
-              <div style={{ flex: 1 }} />
-              <Pill text={r.result} ramp={r.result === 'correct' ? 'green' : 'red'} />
+          <div key={i} style={{ padding: '11px 0', borderBottom: i < MCX_BACKTEST.length - 1 ? '0.5px solid #F1EFE8' : 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <Pill text={r.symbol} ramp="gray" /><span style={{ fontSize: 11, color: '#888780' }}>{r.weekOf}</span>
             </div>
             {r.note && <div style={{ fontSize: 12, color: '#5F5E5A', lineHeight: 1.55, marginBottom: 3 }}>{r.note}</div>}
-            {r.dataConfidence && <div style={{ fontSize: 10.5, color: '#888780', fontStyle: 'italic' }}>Data confidence: {r.dataConfidence}</div>}
+            {r.dataConfidence && <div style={{ fontSize: 10.5, color: '#888780', fontStyle: 'italic', marginBottom: 4 }}>Data confidence: {r.dataConfidence}</div>}
             {r.rootCause && (
-              <div style={{ background: RAMPS.red[50], borderRadius: 9, padding: '11px 13px', marginTop: 7 }}>
-                <div style={{ fontSize: 12, fontWeight: 500, color: RAMPS.red[800], marginBottom: 5, display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <i className="ti ti-alert-triangle" style={{ fontSize: 14 }} aria-hidden="true" />Why this prediction was false
-                </div>
-                <div style={{ fontSize: 12, color: RAMPS.red[800], marginBottom: 6, lineHeight: 1.6 }}>{r.rootCause}</div>
-                <div style={{ fontSize: 12, color: RAMPS.green[800], background: RAMPS.green[50], borderRadius: 7, padding: '7px 9px', lineHeight: 1.55 }}>
-                  <i className="ti ti-tool" style={{ fontSize: 13, marginRight: 4 }} aria-hidden="true" /><strong>Fix applied:</strong> {r.fixNote}
+              <div style={{ background: RAMPS.red[50], borderRadius: 9, padding: '10px 12px', marginTop: 4 }}>
+                <div style={{ fontSize: 11.5, color: RAMPS.red[800], marginBottom: 5, lineHeight: 1.6 }}>{r.rootCause}</div>
+                <div style={{ fontSize: 11.5, color: RAMPS.green[800], background: RAMPS.green[50], borderRadius: 7, padding: '6px 9px', lineHeight: 1.5 }}>
+                  <i className="ti ti-tool" style={{ fontSize: 13, marginRight: 4 }} aria-hidden="true" /><strong>Fix:</strong> {r.fixNote}
                 </div>
               </div>
             )}
@@ -594,36 +672,36 @@ function Playbook() {
   const items = [
     {
       icon: 'ti-target-arrow', ramp: 'green', title: 'Win-size vs loss-size, not win-rate, decides monthly P&L',
-      body: 'A system that wins 40% of the time but wins 3x its average loss is more profitable than one that wins 70% of the time at 1:1. The credit-spread engine on the NIFTY home tab is built around this — small, frequent, high-probability wins; the 3:25 PM play is the deliberate opposite, a small number of asymmetric winners. Track both win rate AND average-win/average-loss separately — optimizing only for win rate is the most common way retail traders quietly lose money while feeling like they are doing well most days.',
+      body: 'A system that wins 40% of the time but wins 3x its average loss is more profitable than one that wins 70% of the time at 1:1. The dashboard now ranks every trade structure by this ratio explicitly, and shows the honest tradeoff: a credit spread\'s higher win-rate comes with a worse ratio, and the debit spreads\' better ratio comes with a lower win-rate. There is no structure that gives you both — anyone claiming otherwise is not accounting for one side of the trade.',
     },
     {
-      icon: 'ti-calendar-time', ramp: 'amber', title: 'Day-of-week and DTE patterns are real but decay — re-test monthly',
-      body: 'Earlier research on this account found Monday entries and 4-5 day DTE produced materially better win rates than Tuesday/Friday entries and 0-2 day DTE, tied to the post-Sep-2025 Tuesday expiry cycle. These patterns come from market microstructure and they DO shift when the underlying expiry calendar or volatility regime shifts. Re-run this specific check against the most recent 4-6 weeks at least monthly rather than assuming it holds forever.',
+      icon: 'ti-calendar-time', ramp: 'amber', title: 'Holding longer has outperformed holding short in your own data',
+      body: 'DTE 4-5 entries: 89-100% win rate. DTE 0-1 entries: 25-43% win rate. This is now reflected directly in the forecast structure — three horizons (next session, next expiry, next week) instead of one — rather than buried in a backtest table you have to go find separately.',
+    },
+    {
+      icon: 'ti-fingerprint', ramp: 'purple', title: 'The evidence chain is real option-chain literacy, not invented pattern-matching',
+      body: 'The four OI-buildup patterns (long buildup, short buildup, short covering, long unwinding) used here are standard, published techniques — sourced this session from PL Capital, AlgoTest, and NiftyTrader educational material, not proprietary. Every professional source reviewed gives the same caution: OI alone can reflect hedging, not conviction, and must be combined with price and volume. The dashboard\'s evidence chain follows that same caution — it states a source for every dot, and does not claim to see live order-book depth, which would require a paid data feed this system does not have.',
     },
     {
       icon: 'ti-droplet', ramp: 'coral', title: 'Track commodity and FX correlation as leading indicators, not just confirming ones',
       body: "Brent crude and USD/INR both move NIFTY with a short lag through import costs, inflation expectations, and FII flows. The MCX tab exists specifically so a crude or gold move can be read as an early signal for NIFTY the next session, not just analysed in isolation. The 24 Jun miss happened precisely because crude's move was real and visible but not yet wired into the NIFTY score at the time.",
     },
     {
-      icon: 'ti-news', ramp: 'pink', title: 'Named catalysts deserve their own factor, weighted by resolution date',
-      body: 'A generic catalyst flag is a blunt instrument. The more useful version tracks: what is the event, when does it resolve, and what is the position-sizing implication for trades that would still be open at resolution. The Iran-US talks sitting unresolved over the 26-29 June holiday weekend is exactly this kind of risk — it argues for smaller size or no new directional bets until the outcome is known, not just a generic watch-the-news note.',
+      icon: 'ti-filter', ramp: 'blue', title: 'Trade only where conviction is high — skip the rest, deliberately',
+      body: 'The MCX tab now splits commodities into tradable (HIGH conviction) and watch only (everything else) instead of presenting all five as equally actionable. The same discipline applies to NIFTY: when the score sits inside ±30, the dashboard recommends no trade, not a low-conviction one. Sitting out is a valid, recorded outcome.',
     },
     {
-      icon: 'ti-calendar-exclamation', ramp: 'blue', title: 'Weekends and holidays are wider, slower-resolving risk windows',
-      body: 'A 3-day gap (Thursday close to Monday open, as happens around a Friday holiday) gives unresolved news 3x the normal window to move the market before the next session even opens. Confidence should be reduced and predicted ranges widened specifically because of elapsed time, independent of how strong the underlying signals look. This was added to the model as v4 specifically because of the 26 June Muharram holiday.',
-    },
-    {
-      icon: 'ti-stack-2', ramp: 'purple', title: 'Keep the model auditable — every factor traces to a real miss or a real source',
-      body: 'It is tempting to keep adding smart-looking factors. The discipline that has kept this system honest so far: every factor currently in the model was added because of a specific, named, dated prediction failure with a documented root cause (see the NIFTY 30-day tab). The model grows only when it has actually been wrong in a way the new factor would have caught — not speculatively. Keep this discipline as the system evolves.',
+      icon: 'ti-stack-2', ramp: 'gray', title: 'Keep the model auditable — every factor traces to a real miss or a real source',
+      body: 'Every factor currently in the model was added because of a specific, named, dated prediction failure with a documented root cause, or because of a feature request that exposed a real structural gap (like the credit-spread ratio issue fixed in v5). The model grows only when it has actually been wrong or incomplete in a way the new factor addresses, not speculatively.',
     },
   ]
 
   return (
     <>
       <Card style={{ marginBottom: '1.1rem', background: `linear-gradient(135deg, ${RAMPS.blue[50]}, #fff 70%)` }} ramp="blue">
-        <SectionLabel icon="ti-bulb">What this system needs to keep improving, based on deep research so far</SectionLabel>
+        <SectionLabel icon="ti-bulb">What this system needs to keep improving</SectionLabel>
         <div style={{ fontSize: 13, color: RAMPS.blue[800], lineHeight: 1.7 }}>
-          These are structural notes for building a system that compounds small edges reliably, rather than chasing a single perfect prediction. Each item below comes from something that was either tested against real outcomes on this dashboard, or is a well-documented pattern from how options markets and institutional flows actually behave.
+          Structural notes for building a system that compounds small edges reliably, rather than chasing a single perfect prediction.
         </div>
       </Card>
 
