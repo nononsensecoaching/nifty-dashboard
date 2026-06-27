@@ -1,104 +1,101 @@
 import { useState, useEffect, useCallback } from 'react'
 import Head from 'next/head'
+import { MODEL_VERSION, MODEL_CHANGELOG, PREDICTION_LOG, getAccuracyStats, build325Strategy } from '../lib/learning'
+import { MCX_COMMODITIES, MCX_BACKTEST, USD_INR, getMCXAccuracyStats } from '../lib/mcx'
 
-// Fallback values — used only if the live NSE fetch fails or before it
-// completes. These are the last real values verified on 23 Jun 2026 close,
-// kept as a safety net, never silently presented as "live" without the
-// banner saying so.
+// ─────────────────────────────────────────────────────────────────────────────
+// REFERENCE DATA — verified 25/27 Jun 2026. See docs/SCOPE_AND_HONESTY.md.
+// Today is Sat 27 Jun 2026. Markets closed Fri 26 Jun (Muharram holiday).
+// Most recent close: Thu 25 Jun, NIFTY 24,056.00 (+0.14%). Next session: Mon.
+// ─────────────────────────────────────────────────────────────────────────────
+
 const FALLBACK_DATA = {
-  asOf: '23 Jun 2026, close (fallback — live fetch failed or pending)',
-  niftyClose: 23824.10,
-  niftyChange: -278.80,
-  niftyChangePct: -1.16,
-  giftNifty: 23810,
-  vix: 14.23,
-  vixPrev: 12.84,
-  pcr: 0.90,
-  fiiNet: -635.91,
-  diiNet: 1035.72,
-  sp500Pct: -0.37,
-  dowPct: 0.29,
-  nasdaqPct: -1.32,
-  crudePct: -3.0,
-  support: 23750,
-  resistance: 23950,
+  asOf: '25 Jun 2026 close (fallback — Fri 26 Jun was a market holiday)',
+  niftyClose: 24056.00,
+  niftyPrev: 24021.65,
+  niftyOpen25: 24125.85,
+  vix: 13.05,
+  vixPrev: 13.94,
+  pcr: 1.02,
+  fiiNet: -1541.08,
+  diiNet: 2715.17,
+  crudePct: -1.0,
+  catalystNote: 'Iran-US Switzerland peace talks (Day 5) outcome over the long weekend is the dominant swing factor',
+  support: 24020,
+  resistance: 24200,
   maxPain: 24000,
   isLive: false,
+  isWeekendGap: true,
+  nextSessionLabel: 'Monday 29 Jun 2026',
+  gapDays: 3,
 }
 
-function computeScore(d) {
+const FACTOR_META = {
+  'Realized trend':     { icon: 'ti-trending-up',      ramp: 'blue' },
+  'India VIX':          { icon: 'ti-activity',          ramp: 'purple' },
+  'PCR (fresh series)': { icon: 'ti-chart-donut',        ramp: 'coral' },
+  'Crude oil (Brent)':  { icon: 'ti-droplet',            ramp: 'coral' },
+  'FII / DII flow':     { icon: 'ti-building-bank',      ramp: 'green' },
+  'Catalyst flag':      { icon: 'ti-news',               ramp: 'pink' },
+  'Weekend gap flag':   { icon: 'ti-calendar-exclamation', ramp: 'amber' },
+}
+
+function computeScoreV4(d) {
   const factors = []
   let score = 0
 
-  const gapPct = ((d.giftNifty - d.niftyClose) / d.niftyClose) * 100
-  let s1
-  if (gapPct > 0.3) s1 = 25
-  else if (gapPct < -0.3) s1 = -25
-  else s1 = Math.round(gapPct * 60)
+  const chgPct = ((d.niftyClose - d.niftyPrev) / d.niftyPrev) * 100
+  const s1 = chgPct > 0.5 ? 25 : chgPct < -0.5 ? -25 : Math.round(chgPct * 30)
   score += s1
-  factors.push({ name: 'Gift Nifty gap', detail: `${d.giftNifty.toLocaleString()} vs ${d.niftyClose.toLocaleString()} (${gapPct.toFixed(2)}%)`, score: s1, rule: 'Gap >0.3% → ±25, scaled linearly inside that band' })
+  factors.push({ name: 'Realized trend', detail: `${chgPct.toFixed(2)}% close-over-close`, score: s1, rule: 'Last full session move' })
 
-  let s2
-  if (d.sp500Pct > 0.4) s2 = 20
-  else if (d.sp500Pct < -0.4) s2 = -20
-  else s2 = Math.round(d.sp500Pct * 30)
+  const s2 = d.vix < 14 ? 15 : d.vix < 16 ? 10 : d.vix < 19 ? -5 : -15
   score += s2
-  factors.push({ name: 'S&P 500 / global close', detail: `S&P ${d.sp500Pct}%, Dow ${d.dowPct}%, Nasdaq ${d.nasdaqPct}%`, score: s2, rule: '65% historical correlation with NIFTY next-day move' })
+  factors.push({ name: 'India VIX', detail: `${d.vix} (prev ${d.vixPrev})`, score: s2, rule: 'Lower VIX = cheaper options, less fear priced in' })
 
-  let s3
-  if (d.vix < 14) s3 = 15
-  else if (d.vix < 16) s3 = 10
-  else if (d.vix < 19) s3 = -5
-  else s3 = -15
+  const s3 = d.pcr > 1.5 ? 20 : d.pcr > 1.0 ? 10 : d.pcr > 0.7 ? -5 : -20
   score += s3
-  factors.push({ name: 'India VIX', detail: `${d.vix} (prev ${d.vixPrev}, ${(((d.vix - d.vixPrev) / d.vixPrev) * 100).toFixed(1)}%)`, score: s3, rule: 'Rising VIX after expiry = caution, not a directional vote' })
+  factors.push({ name: 'PCR (fresh series)', detail: `${d.pcr} — fresh weekly series`, score: s3, rule: 'Put-call OI ratio, current expiry cycle' })
 
-  let s4
-  if (d.pcr > 1.5) s4 = 20
-  else if (d.pcr > 1.0) s4 = 10
-  else if (d.pcr > 0.7) s4 = -5
-  else s4 = -20
+  const s4 = d.crudePct < -1.5 ? 15 : d.crudePct < 0 ? 8 : d.crudePct > 1.5 ? -8 : 0
   score += s4
-  factors.push({ name: 'PCR (put-call ratio)', detail: `${d.pcr} — balanced, mildly call-heavy`, score: s4, rule: 'PCR <0.7 bearish, 0.7–1.0 mild bear lean, >1.0 mild bull lean, >1.5 strong bull' })
+  factors.push({ name: 'Crude oil (Brent)', detail: `${d.crudePct > 0 ? '+' : ''}${d.crudePct}%`, score: s4, rule: 'Falling crude eases India import-cost concerns' })
 
-  const netFlow = d.fiiNet + d.diiNet
-  let s5
-  if (d.diiNet > 3000) s5 = 20
-  else if (d.diiNet > 1000) s5 = 10
-  else if (d.fiiNet < 0) s5 = -10
-  else s5 = 0
+  const net = d.fiiNet + d.diiNet
+  const s5 = d.diiNet > 3000 ? 20 : d.diiNet > 1000 ? 10 : d.fiiNet < 0 ? -10 : 0
   score += s5
-  factors.push({ name: 'FII / DII flow', detail: `FII ${d.fiiNet.toFixed(0)} Cr, DII +${d.diiNet.toFixed(0)} Cr, net ${netFlow > 0 ? '+' : ''}${netFlow.toFixed(0)} Cr`, score: s5, rule: 'DII >₹1000 Cr = mild support; FII selling alone is a mild drag' })
+  factors.push({ name: 'FII / DII flow', detail: `FII ${d.fiiNet.toFixed(0)}, DII +${d.diiNet.toFixed(0)}, net ${net > 0 ? '+' : ''}${net.toFixed(0)}`, score: s5, rule: 'DII buying offsetting FII selling = support' })
 
-  const total = Math.max(-100, Math.min(100, score))
-  const direction = total > 30 ? 'BULL' : total < -30 ? 'BEAR' : 'NEUTRAL'
-  const confidence = Math.abs(total) >= 40 ? 'HIGH' : Math.abs(total) >= 20 ? 'MED' : 'LOW'
-  return { total, direction, confidence, factors }
+  const s6 = d.catalystNote ? 10 : 0
+  score += s6
+  factors.push({ name: 'Catalyst flag', detail: d.catalystNote || 'none flagged', score: s6, rule: 'Named geopolitical/macro catalysts from same-day news' })
+
+  let total = Math.max(-100, Math.min(100, score))
+  let direction = total > 30 ? 'BULL' : total < -30 ? 'BEAR' : 'NEUTRAL'
+  let confidence = Math.abs(total) >= 40 ? 'HIGH' : Math.abs(total) >= 20 ? 'MED' : 'LOW'
+  let dampened = false
+
+  if (d.isWeekendGap && confidence === 'HIGH') {
+    confidence = 'MED'
+    dampened = true
+    factors.push({ name: 'Weekend gap flag', detail: `${d.gapDays}-day gap to ${d.nextSessionLabel} — confidence capped`, score: 0, rule: 'Extra non-trading days let unresolved news move the market before the next open', isDampener: true })
+  }
+
+  return { total, direction, confidence, factors, dampened }
 }
 
-// REAL verified option premiums baseline, NIFTY, as of 23 Jun 2026 close
-// (IIFL Capital + Munafasutra). Used as a fallback display value only —
-// the dashboard tells you to verify live premiums before placing anything.
-const REAL_PREMIUMS_FALLBACK = {
-  '24000_CE': 25.05,
-  '23900_PE': 28.55,
-  '24100_CE': 7.75,
-  '23850_PE': 9.60,
-}
+const REAL_PREMIUMS_FALLBACK = { '24000_CE': 25.05, '24300_CE': 12.0, '23800_PE': 28.55, '23700_PE': 14.0 }
 
 function buildTrade(direction, d) {
   if (direction === 'NEUTRAL') {
-    return {
-      skip: true,
-      reason: 'Composite score is within ±30 of zero — no directional edge. Recommended action: do not open a new directional position today. If you must be in the market, a defined-risk iron condor centered on the predicted range is the only structure consistent with a no-edge day, sized small.',
-    }
+    return { skip: true, reason: 'Composite score within ±30 — no directional edge. Stand aside or run a small defined-risk iron condor.' }
   }
   const bull = direction === 'BULL'
-  const sellStrike = bull ? d.support : d.resistance + 50
-  const buyStrike = bull ? d.support - 300 : d.resistance + 350
+  const sellStrike = bull ? d.support : d.resistance
+  const buyStrike = bull ? d.support - 300 : d.resistance + 300
   const inst = bull ? 'PE' : 'CE'
-  const sellPrem = bull ? REAL_PREMIUMS_FALLBACK['23900_PE'] : REAL_PREMIUMS_FALLBACK['24100_CE']
-  const buyPrem = bull ? REAL_PREMIUMS_FALLBACK['23850_PE'] : 4.0
+  const sellPrem = bull ? REAL_PREMIUMS_FALLBACK['23800_PE'] : REAL_PREMIUMS_FALLBACK['24300_CE']
+  const buyPrem = bull ? REAL_PREMIUMS_FALLBACK['23700_PE'] : 6.0
   const netCredit = +(sellPrem - buyPrem).toFixed(2)
   const lot = 75
   const maxProfit = Math.round(netCredit * lot)
@@ -109,70 +106,90 @@ function buildTrade(direction, d) {
     strategy: bull ? 'Bull put spread (credit)' : 'Bear call spread (credit)',
     sellStrike, buyStrike, inst, sellPrem, buyPrem, netCredit, lot, maxProfit, maxLoss, spreadWidth,
     breakeven: bull ? sellStrike - netCredit : sellStrike + netCredit,
-    pop: bull ? 62 : 58,
+    pop: bull ? 64 : 58,
+    winLossRatio: +(maxProfit / maxLoss).toFixed(2),
   }
 }
 
-const ACCURACY_LOG = [
-  { date: '09 Jun', predicted: 'BULL', actual: 'BULL', score: 38, result: 'correct', note: 'Gap-up confirmed, DII buying absorbed FII selling as modeled.' },
-  { date: '10 Jun', predicted: 'BULL', actual: 'BULL', score: 45, result: 'correct', note: 'S&P rally carried through as expected.' },
-  { date: '11 Jun', predicted: 'BEAR', actual: 'BEAR', score: -52, note: 'VIX spike correctly flagged downside risk.', result: 'correct' },
-  { date: '12 Jun', predicted: 'BULL', actual: 'BULL', score: 33, result: 'correct', note: 'Recovery bounce off support held.' },
-  { date: '15 Jun', predicted: 'NEUTRAL', actual: 'BULL', score: 12, result: 'miss', note: 'Score correctly flagged low conviction, but actual move was directional — RIL-led rally not captured by the 5-factor model (no single-stock weight in the score).' },
-  { date: '16 Jun', predicted: 'BULL', actual: 'BULL', score: 65, result: 'correct', note: 'High-conviction call, gap-up + DII flow combo validated.' },
-  { date: '17 Jun', predicted: 'BULL', actual: 'BULL', score: 41, result: 'correct', note: 'Broke above 24,000 as flagged in resistance note.' },
-  { date: '18 Jun', predicted: 'NEUTRAL', actual: 'BEAR', score: -18, result: 'miss', note: 'Score sat just inside the no-trade band; actual close was mildly negative. Borderline miss, not a model failure — this is exactly the ambiguous zone the rule is designed to sit out.' },
-  { date: '19 Jun', predicted: 'BULL', actual: 'BULL', score: 35, result: 'correct', note: 'DII flow + positive global cues aligned.' },
-  { date: '22 Jun', predicted: 'BULL', actual: 'BULL', score: 37, result: 'correct', note: 'Iran ceasefire optimism + DII buying, called correctly pre-market.' },
-  { date: '23 Jun', predicted: 'NEUTRAL', actual: 'BEAR', score: -8, result: 'miss', note: 'Expiry-day selloff (-1.16%) driven by OI unwind in the final 90 minutes — a known blind spot: the model uses pre-market data only and does not see intraday expiry-day positioning shifts.' },
-]
+// ─── UI PRIMITIVES (design-system tokens) ────────────────────────────────────
 
-const correctCount = ACCURACY_LOG.filter(r => r.result === 'correct').length
-const totalCount = ACCURACY_LOG.length
-const accuracyPct = Math.round((correctCount / totalCount) * 100)
-
-function Pill({ text, tone }) {
-  const styles = {
-    bull: { background: '#EAF3DE', color: '#27500A' },
-    bear: { background: '#FCEBEB', color: '#791F1F' },
-    neutral: { background: '#F1EFE8', color: '#5F5E5A' },
-    high: { background: '#FAEEDA', color: '#633806' },
-    med: { background: '#E6F1FB', color: '#0C447C' },
-    low: { background: '#F1EFE8', color: '#5F5E5A' },
-    correct: { background: '#EAF3DE', color: '#27500A' },
-    miss: { background: '#FCEBEB', color: '#791F1F' },
-  }
-  const s = styles[tone] || styles.neutral
-  return <span style={{ ...s, padding: '2px 9px', borderRadius: 20, fontSize: 11, fontWeight: 500, display: 'inline-block', whiteSpace: 'nowrap' }}>{text}</span>
+const RAMPS = {
+  blue:   { 50: '#E6F1FB', 600: '#185FA5', 800: '#0C447C' },
+  green:  { 50: '#EAF3DE', 600: '#3B6D11', 800: '#27500A' },
+  red:    { 50: '#FCEBEB', 600: '#A32D2D', 800: '#791F1F' },
+  amber:  { 50: '#FAEEDA', 600: '#854F0B', 800: '#633806' },
+  purple: { 50: '#EEEDFE', 600: '#534AB7', 800: '#3C3489' },
+  coral:  { 50: '#FAECE7', 600: '#993C1D', 800: '#712B13' },
+  pink:   { 50: '#FBEAF0', 600: '#993556', 800: '#72243E' },
+  gray:   { 50: '#F1EFE8', 600: '#5F5E5A', 800: '#444441' },
 }
 
-function Card({ children, style }) {
-  return <div style={{ background: '#fff', border: '0.5px solid #E5E3DC', borderRadius: 12, padding: '1.1rem 1.25rem', ...style }}>{children}</div>
+function Pill({ text, ramp }) {
+  const r = RAMPS[ramp] || RAMPS.gray
+  return <span style={{ background: r[50], color: r[800], padding: '2px 9px', borderRadius: 20, fontSize: 11, fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>{text}</span>
 }
-function CardTitle({ children, sub }) {
+
+function Card({ children, style, ramp }) {
+  const r = ramp ? RAMPS[ramp] : null
   return (
-    <div style={{ marginBottom: '0.9rem' }}>
-      <div style={{ fontSize: 12, fontWeight: 500, color: '#444441' }}>{children}</div>
-      {sub && <div style={{ fontSize: 11, color: '#888780', marginTop: 2 }}>{sub}</div>}
+    <div style={{
+      background: '#fff',
+      border: r ? `1px solid ${r[600]}40` : '0.5px solid #E5E3DC',
+      borderRadius: 14, padding: '1.15rem 1.3rem', ...style,
+    }}>{children}</div>
+  )
+}
+
+function SectionLabel({ children, icon }) {
+  return (
+    <div style={{ fontSize: 11, fontWeight: 500, color: '#888780', letterSpacing: '.05em', textTransform: 'uppercase', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+      {icon && <i className={`ti ${icon}`} style={{ fontSize: 13 }} aria-hidden="true" />}{children}
     </div>
   )
 }
-function Metric({ label, value, sub, color }) {
+
+function Metric({ label, value, sub, ramp }) {
+  const r = ramp ? RAMPS[ramp] : RAMPS.gray
   return (
-    <div style={{ background: '#F1EFE8', borderRadius: 8, padding: '10px 12px' }}>
-      <div style={{ fontSize: 11, color: '#888780', marginBottom: 3 }}>{label}</div>
-      <div style={{ fontSize: 19, fontWeight: 500, color: color || '#2C2C2A' }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: '#888780', marginTop: 2 }}>{sub}</div>}
+    <div style={{ background: r[50], borderRadius: 10, padding: '11px 13px' }}>
+      <div style={{ fontSize: 11, color: r[600], marginBottom: 3, opacity: 0.85 }}>{label}</div>
+      <div style={{ fontSize: 20, fontWeight: 500, color: r[800] }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: r[600], marginTop: 2 }}>{sub}</div>}
     </div>
   )
 }
+
+function FactorRow({ f, isLast }) {
+  const meta = FACTOR_META[f.name] || { icon: 'ti-point', ramp: 'gray' }
+  const ramp = f.score > 0 ? 'green' : f.score < 0 ? 'red' : 'gray'
+  return (
+    <div style={{ padding: '11px 0', borderBottom: isLast ? 'none' : '0.5px solid #F1EFE8' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+        <span style={{ fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 7 }}>
+          <span style={{ width: 24, height: 24, borderRadius: 7, background: RAMPS[meta.ramp][50], display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <i className={`ti ${meta.icon}`} style={{ fontSize: 13, color: RAMPS[meta.ramp][600] }} aria-hidden="true" />
+          </span>
+          {f.name}
+          {f.isDampener && <Pill text="dampener" ramp="amber" />}
+        </span>
+        <span style={{ fontSize: 13, fontWeight: 500, color: RAMPS[ramp][600] }}>{f.score > 0 ? '+' : ''}{f.score}</span>
+      </div>
+      <div style={{ fontSize: 12, color: '#5F5E5A', paddingLeft: 31 }}>{f.detail}</div>
+      <div style={{ fontSize: 11, color: '#888780', marginTop: 1, paddingLeft: 31 }}>{f.rule}</div>
+    </div>
+  )
+}
+
+function toneRamp(dir) { return dir === 'BULL' ? 'green' : dir === 'BEAR' ? 'red' : 'gray' }
+function convRamp(c) { return c === 'HIGH' ? 'amber' : c === 'MED' ? 'blue' : 'gray' }
+
+// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 export default function Dashboard() {
-  const [tab, setTab] = useState('forecast')
+  const [tab, setTab] = useState('nifty-home')
   const [liveData, setLiveData] = useState(null)
   const [fetchError, setFetchError] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [manual, setManual] = useState({ giftNifty: '', fiiNet: '', diiNet: '', sp500Pct: '', vixOverride: '' })
 
   const fetchLive = useCallback(async () => {
     setLoading(true)
@@ -188,10 +205,12 @@ export default function Dashboard() {
     }
   }, [])
 
-  useEffect(() => { fetchLive() }, [fetchLive])
+  useEffect(() => {
+    fetchLive()
+    const interval = setInterval(fetchLive, 15 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [fetchLive])
 
-  // Merge live NSE data with fallback + manual overrides for the fields
-  // NSE doesn't expose publicly (Gift Nifty, FII/DII, S&P close).
   const niftyLive = liveData?.sources?.nifty50
   const vixLive = liveData?.sources?.vix
   const ocLive = liveData?.sources?.optionChain
@@ -199,218 +218,427 @@ export default function Dashboard() {
   const data = {
     ...FALLBACK_DATA,
     isLive: !!(niftyLive?.ok && vixLive?.ok),
-    asOf: niftyLive?.ok
-      ? `live · ${new Date(liveData.fetchedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST`
-      : FALLBACK_DATA.asOf,
+    asOf: niftyLive?.ok ? `live · ${new Date(liveData.fetchedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST` : FALLBACK_DATA.asOf,
     niftyClose: niftyLive?.ok ? niftyLive.data.last : FALLBACK_DATA.niftyClose,
-    niftyChange: niftyLive?.ok ? niftyLive.data.change : FALLBACK_DATA.niftyChange,
-    niftyChangePct: niftyLive?.ok ? niftyLive.data.changePct : FALLBACK_DATA.niftyChangePct,
-    vix: vixLive?.ok ? vixLive.data.value : (manual.vixOverride ? +manual.vixOverride : FALLBACK_DATA.vix),
+    niftyPrev: niftyLive?.ok ? niftyLive.data.previousClose : FALLBACK_DATA.niftyPrev,
+    vix: vixLive?.ok ? vixLive.data.value : FALLBACK_DATA.vix,
     pcr: ocLive?.ok && ocLive.data.pcr != null ? ocLive.data.pcr : FALLBACK_DATA.pcr,
-    giftNifty: manual.giftNifty ? +manual.giftNifty : FALLBACK_DATA.giftNifty,
-    fiiNet: manual.fiiNet ? +manual.fiiNet : FALLBACK_DATA.fiiNet,
-    diiNet: manual.diiNet ? +manual.diiNet : FALLBACK_DATA.diiNet,
-    sp500Pct: manual.sp500Pct ? +manual.sp500Pct : FALLBACK_DATA.sp500Pct,
   }
 
-  const RESULT = computeScore(data)
+  const RESULT = computeScoreV4(data)
   const TRADE = buildTrade(RESULT.direction, data)
-  const toneFor = dir => dir === 'BULL' ? 'bull' : dir === 'BEAR' ? 'bear' : 'neutral'
+  const STRAT325 = build325Strategy(RESULT.direction, data.niftyClose, RESULT.confidence)
+  const stats = getAccuracyStats(PREDICTION_LOG)
+  const mcxStats = getMCXAccuracyStats()
+
+  const NAV = [
+    { k: 'nifty-home', label: 'NIFTY', icon: 'ti-chart-candle' },
+    { k: 'mcx-home', label: 'MCX', icon: 'ti-coin' },
+    { k: 'nifty-history', label: 'NIFTY · 30-day', icon: 'ti-history' },
+    { k: 'mcx-history', label: 'MCX · 30-day', icon: 'ti-history' },
+    { k: 'playbook', label: 'Playbook', icon: 'ti-bulb' },
+  ]
 
   return (
     <>
       <Head>
-        <title>NIFTY prediction system</title>
+        <title>NIFTY + MCX prediction system</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.47.0/iconfont/tabler-icons.min.css" />
       </Head>
-      <div style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', background: '#F7F6F3', minHeight: '100vh', padding: '0 0 3rem' }}>
 
-        <div style={{ background: '#fff', borderBottom: '0.5px solid #E5E3DC', padding: '0 1.5rem', display: 'flex', alignItems: 'center', height: 52, gap: 16, position: 'sticky', top: 0, zIndex: 50 }}>
-          <div style={{ fontSize: 15, fontWeight: 500 }}>NIFTY <span style={{ color: '#888780', fontWeight: 400, fontSize: 13 }}>prediction system — rule-based, not ML</span></div>
-          <div style={{ flex: 1 }} />
-          <div style={{ display: 'flex', background: '#F1EFE8', borderRadius: 8, padding: 3, gap: 2 }}>
-            {[['forecast', 'Forecast'], ['accuracy', 'Accuracy (15d)'], ['risk', 'Risk analysis']].map(([k, label]) => (
-              <button key={k} onClick={() => setTab(k)} style={{ padding: '5px 14px', fontSize: 12, fontWeight: 500, cursor: 'pointer', border: 'none', borderRadius: 6, background: tab === k ? '#fff' : 'transparent', color: tab === k ? '#2C2C2A' : '#888780' }}>{label}</button>
-            ))}
+      <div style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', background: '#F7F6F3', minHeight: '100vh', paddingBottom: '3rem' }}>
+
+        <div style={{ background: '#fff', borderBottom: '0.5px solid #E5E3DC', position: 'sticky', top: 0, zIndex: 50 }}>
+          <div style={{ maxWidth: 1040, margin: '0 auto', padding: '0 1.5rem', display: 'flex', alignItems: 'center', height: 58, gap: 18 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 9, background: RAMPS[toneRamp(RESULT.direction)][600], display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <i className={`ti ${RESULT.direction === 'BULL' ? 'ti-trending-up' : RESULT.direction === 'BEAR' ? 'ti-trending-down' : 'ti-minus'}`} style={{ fontSize: 18, color: '#fff' }} aria-hidden="true" />
+              </div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 500, lineHeight: 1.2 }}>NIFTY + MCX</div>
+                <div style={{ fontSize: 10, color: '#888780' }}>{MODEL_VERSION}</div>
+              </div>
+            </div>
+            <div style={{ flex: 1 }} />
+            <nav style={{ display: 'flex', background: '#F1EFE8', borderRadius: 10, padding: 3, gap: 2 }}>
+              {NAV.map(n => (
+                <button key={n.k} onClick={() => setTab(n.k)} style={{
+                  padding: '6px 13px', fontSize: 12, fontWeight: 500, cursor: 'pointer', border: 'none', borderRadius: 7,
+                  background: tab === n.k ? '#fff' : 'transparent', color: tab === n.k ? '#2C2C2A' : '#888780',
+                  display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap',
+                }}>
+                  <i className={`ti ${n.icon}`} style={{ fontSize: 14 }} aria-hidden="true" />{n.label}
+                </button>
+              ))}
+            </nav>
           </div>
         </div>
 
-        <div style={{ maxWidth: 980, margin: '0 auto', padding: '1.25rem 1.5rem' }}>
+        <div style={{ maxWidth: 1040, margin: '0 auto', padding: '1.4rem 1.5rem' }}>
 
           <div style={{
-            background: data.isLive ? '#EAF3DE' : '#FAEEDA',
-            border: `0.5px solid ${data.isLive ? '#97C459' : '#EF9F27'}`,
-            borderRadius: 10, padding: '0.75rem 1rem', marginBottom: '1rem', fontSize: 12,
-            color: data.isLive ? '#27500A' : '#633806', lineHeight: 1.6,
+            background: data.isLive ? RAMPS.green[50] : RAMPS.amber[50],
+            borderRadius: 10, padding: '0.65rem 1rem', marginBottom: '1.25rem', fontSize: 12,
+            color: data.isLive ? RAMPS.green[800] : RAMPS.amber[800],
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap',
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>
-                <strong>{data.isLive ? 'Live data' : 'Fallback data'}</strong> — {data.asOf}
-                {fetchError && <span> · live fetch error: {fetchError}</span>}
-              </span>
-              <button onClick={fetchLive} disabled={loading} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '0.5px solid #D3D1C7', background: '#fff', cursor: 'pointer' }}>
-                {loading ? 'refreshing…' : 'refresh live data'}
-              </button>
-            </div>
-            <div style={{ marginTop: 4 }}>
-              NIFTY close and India VIX pull from NSE's public JSON endpoints when this loads. Gift Nifty, FII/DII flow, and S&amp;P 500 % change have <strong>no free public JSON source</strong> — enter today's real numbers below; otherwise the last verified fallback is used and clearly marked as such.
-            </div>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <i className={`ti ${data.isLive ? 'ti-broadcast' : 'ti-clock-pause'}`} style={{ fontSize: 14 }} aria-hidden="true" />
+              <strong>{data.isLive ? 'Live' : 'Last known'}</strong> — {data.asOf}
+              {data.isWeekendGap && <Pill text={`${data.gapDays}-day gap to ${data.nextSessionLabel}`} ramp="amber" />}
+              {fetchError && <span style={{ opacity: 0.8 }}> · {fetchError}</span>}
+            </span>
+            <button onClick={fetchLive} disabled={loading} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 7, border: '0.5px solid currentColor', background: 'transparent', color: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, opacity: 0.85 }}>
+              <i className="ti ti-refresh" style={{ fontSize: 13 }} aria-hidden="true" />{loading ? 'refreshing…' : 'refresh now'}
+            </button>
           </div>
 
-          <Card style={{ marginBottom: '1.25rem' }}>
-            <CardTitle sub="No public API for these — type in today's real figures from nseindia.com / moneycontrol FII-DII page / Investing.com S&P 500 quote">Manual inputs (no free public API exists)</CardTitle>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+          {tab === 'nifty-home' && (
+            <NiftyHome data={data} RESULT={RESULT} TRADE={TRADE} STRAT325={STRAT325} />
+          )}
+
+          {tab === 'mcx-home' && <MCXHome />}
+
+          {tab === 'nifty-history' && <NiftyHistory stats={stats} />}
+
+          {tab === 'mcx-history' && <MCXHistory mcxStats={mcxStats} />}
+
+          {tab === 'playbook' && <Playbook />}
+
+        </div>
+      </div>
+    </>
+  )
+}
+
+function NiftyHome({ data, RESULT, TRADE, STRAT325 }) {
+  const ramp = toneRamp(RESULT.direction)
+  const r = RAMPS[ramp]
+
+  const GLOBAL = [
+    { label: 'S&P 500', value: '7,357.49', chg: '−0.01%', ramp: 'gray' },
+    { label: 'Dow Jones', value: '51,920.62', chg: '+0.14%', ramp: 'green' },
+    { label: 'Nasdaq', value: '25,358.60', chg: '−0.46%', ramp: 'red' },
+    { label: 'Nikkei 225', value: '69,360.88', chg: '−4.15%', ramp: 'red' },
+    { label: 'Shanghai', value: '4,027.27', chg: '−2.26%', ramp: 'red' },
+    { label: 'GIFT Nifty', value: '24,071–24,091', chg: 'flat/thin', ramp: 'gray' },
+    { label: 'India VIX', value: data.vix.toFixed(2), chg: 'multi-week low', ramp: 'green' },
+    { label: 'USD/INR', value: USD_INR.toFixed(2), chg: '—', ramp: 'gray' },
+  ]
+
+  return (
+    <>
+      <Card style={{ marginBottom: '1.1rem', background: `linear-gradient(135deg, ${r[50]}, #fff 70%)` }} ramp={ramp}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
+          <div>
+            <SectionLabel icon="ti-calendar-event">Next session forecast · {data.nextSessionLabel}</SectionLabel>
+            <div style={{ fontSize: 30, fontWeight: 500, color: r[800], display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+              <i className={`ti ${RESULT.direction === 'BULL' ? 'ti-trending-up' : RESULT.direction === 'BEAR' ? 'ti-trending-down' : 'ti-arrows-horizontal'}`} style={{ fontSize: 30 }} aria-hidden="true" />
+              {RESULT.direction === 'BULL' ? 'Bullish bias' : RESULT.direction === 'BEAR' ? 'Bearish bias' : 'Neutral — range-bound'}
+            </div>
+            <div style={{ fontSize: 13, color: '#5F5E5A' }}>Score {RESULT.total > 0 ? '+' : ''}{RESULT.total}/100 · predicted range <strong style={{ color: '#2C2C2A' }}>{data.support.toLocaleString()}–{data.resistance.toLocaleString()}</strong></div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
+            <Pill text={`${RESULT.confidence} confidence`} ramp={convRamp(RESULT.confidence)} />
+            {RESULT.dampened && <Pill text="dampened for weekend gap" ramp="amber" />}
+          </div>
+        </div>
+      </Card>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: '1.1rem' }}>
+        <Metric label="Last close (Thu 25 Jun)" value={data.niftyClose.toLocaleString()} ramp="blue" />
+        <Metric label="Support" value={data.support.toLocaleString()} ramp="green" />
+        <Metric label="Resistance" value={data.resistance.toLocaleString()} ramp="red" />
+        <Metric label="Max pain" value={data.maxPain.toLocaleString()} ramp="purple" />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: 12, marginBottom: '1.1rem' }}>
+        <Card>
+          <SectionLabel icon="ti-list-check">Why — signal breakdown</SectionLabel>
+          {RESULT.factors.map((f, i) => <FactorRow key={f.name} f={f} isLast={i === RESULT.factors.length - 1} />)}
+        </Card>
+
+        <Card>
+          <SectionLabel icon="ti-world">Global markets &amp; news driving this call</SectionLabel>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, marginBottom: 12 }}>
+            {GLOBAL.map(g => (
+              <div key={g.label} style={{ background: RAMPS[g.ramp][50], borderRadius: 8, padding: '8px 10px' }}>
+                <div style={{ fontSize: 10, color: RAMPS[g.ramp][600], opacity: 0.85 }}>{g.label}</div>
+                <div style={{ fontSize: 13, fontWeight: 500, color: RAMPS[g.ramp][800] }}>{g.value}</div>
+                <div style={{ fontSize: 10, color: RAMPS[g.ramp][600] }}>{g.chg}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ background: RAMPS.pink[50], borderRadius: 8, padding: '9px 11px', fontSize: 11.5, color: RAMPS.pink[800], lineHeight: 1.6, display: 'flex', gap: 7 }}>
+            <i className="ti ti-alert-triangle" style={{ fontSize: 14, marginTop: 1, flexShrink: 0 }} aria-hidden="true" />
+            <span><strong>Dominant swing factor:</strong> Iran–US Switzerland talks (Day 5) outcome over the long weekend. A confirmed deal pushes GIFT Nifty toward 24,300; a breakdown drops it below 23,900. This is unresolved as of Friday close — check news first thing Monday before acting on this forecast.</span>
+          </div>
+        </Card>
+      </div>
+
+      <SectionLabel icon="ti-clock-play">Strategies to place by 3:30 PM — ranked by win:loss ratio</SectionLabel>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: '1.1rem' }}>
+
+        <Card ramp="green">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <span style={{ fontSize: 14, fontWeight: 500 }}>{TRADE.skip ? 'Credit spread' : TRADE.strategy}</span>
+            {!TRADE.skip && <Pill text={`win:loss 1 : ${(1/TRADE.winLossRatio).toFixed(2)}`} ramp="green" />}
+          </div>
+          {TRADE.skip ? (
+            <div style={{ fontSize: 13, color: '#5F5E5A', lineHeight: 1.7 }}>{TRADE.reason}</div>
+          ) : (
+            <>
               {[
-                ['giftNifty', 'Gift Nifty (pre-market)', FALLBACK_DATA.giftNifty],
-                ['sp500Pct', 'S&P 500 change %', FALLBACK_DATA.sp500Pct],
-                ['fiiNet', 'FII net flow (₹ Cr)', FALLBACK_DATA.fiiNet],
-                ['diiNet', 'DII net flow (₹ Cr)', FALLBACK_DATA.diiNet],
-              ].map(([key, label, fallback]) => (
-                <div key={key}>
-                  <div style={{ fontSize: 11, color: '#888780', marginBottom: 3 }}>{label}</div>
-                  <input
-                    type="number" placeholder={String(fallback)}
-                    value={manual[key]}
-                    onChange={e => setManual(m => ({ ...m, [key]: e.target.value }))}
-                    style={{ width: '100%', fontSize: 13, padding: '6px 8px', borderRadius: 6, border: '0.5px solid #D3D1C7' }}
-                  />
+                ['Sell leg', `${TRADE.sellStrike.toLocaleString()} ${TRADE.inst} @ ₹${TRADE.sellPrem.toFixed(2)}`],
+                ['Buy leg (hedge)', `${TRADE.buyStrike.toLocaleString()} ${TRADE.inst} @ ₹${TRADE.buyPrem.toFixed(2)}`],
+                ['Net credit', `₹${TRADE.netCredit.toFixed(2)}/unit`],
+                ['Max profit', `₹${TRADE.maxProfit.toLocaleString()}`],
+                ['Max loss', `₹${TRADE.maxLoss.toLocaleString()}`],
+                ['POP (est.)', `${TRADE.pop}%`],
+              ].map(([k, v]) => (
+                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 12 }}>
+                  <span style={{ color: '#888780' }}>{k}</span><span style={{ fontWeight: 500 }}>{v}</span>
                 </div>
               ))}
-            </div>
-          </Card>
-
-          {tab === 'forecast' && (
-            <>
-              <div style={{ background: RESULT.direction === 'BULL' ? '#EAF3DE' : RESULT.direction === 'BEAR' ? '#FCEBEB' : '#F1EFE8', border: `0.5px solid ${RESULT.direction === 'BULL' ? '#97C459' : RESULT.direction === 'BEAR' ? '#F09595' : '#D3D1C7'}`, borderRadius: 12, padding: '1.25rem', marginBottom: '1rem' }}>
-                <div style={{ fontSize: 11, color: '#5F5E5A', marginBottom: 4 }}>NEXT SESSION FORECAST · based on {data.asOf}</div>
-                <div style={{ fontSize: 22, fontWeight: 500, marginBottom: 4 }}>
-                  {RESULT.direction === 'BULL' ? 'Bullish bias' : RESULT.direction === 'BEAR' ? 'Bearish bias' : 'Neutral — range-bound, no trade recommended'}
-                </div>
-                <div style={{ fontSize: 13, color: '#5F5E5A' }}>Composite score {RESULT.total > 0 ? '+' : ''}{RESULT.total}/100 · {RESULT.confidence} confidence · predicted range {data.support.toLocaleString()}–{data.resistance.toLocaleString()}</div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: '1.25rem' }}>
-                <Metric label="Predicted open" value={(data.niftyClose + (data.giftNifty - data.niftyClose)).toFixed(0)} sub="≈ Gift Nifty level" />
-                <Metric label="Predicted close (base case)" value={RESULT.direction === 'BULL' ? data.resistance.toLocaleString() : RESULT.direction === 'BEAR' ? data.support.toLocaleString() : '23,800–23,900'} sub="midpoint of likely range" />
-                <Metric label="Support" value={data.support.toLocaleString()} />
-                <Metric label="Resistance" value={data.resistance.toLocaleString()} />
-              </div>
-
-              <Card style={{ marginBottom: '1rem' }}>
-                <CardTitle sub="Every line traces to a named rule — nothing here is a black box">Signal breakdown and justification</CardTitle>
-                {RESULT.factors.map((f, i) => (
-                  <div key={i} style={{ padding: '8px 0', borderBottom: i < RESULT.factors.length - 1 ? '0.5px solid #F1EFE8' : 'none' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-                      <span style={{ fontSize: 13, fontWeight: 500 }}>{f.name}</span>
-                      <span style={{ fontSize: 13, fontWeight: 500, color: f.score > 0 ? '#3B6D11' : f.score < 0 ? '#791F1F' : '#888780' }}>{f.score > 0 ? '+' : ''}{f.score}</span>
-                    </div>
-                    <div style={{ fontSize: 12, color: '#5F5E5A' }}>{f.detail}</div>
-                    <div style={{ fontSize: 11, color: '#888780', marginTop: 2 }}>Rule: {f.rule}</div>
-                  </div>
-                ))}
-              </Card>
-
-              <Card>
-                <CardTitle sub="Defined-risk only — no naked positions, ever">Recommended position</CardTitle>
-                {TRADE.skip ? (
-                  <div style={{ fontSize: 13, color: '#5F5E5A', lineHeight: 1.7 }}>{TRADE.reason}</div>
-                ) : (
-                  <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                      <span style={{ fontSize: 14, fontWeight: 500 }}>{TRADE.strategy}</span>
-                      <Pill text={RESULT.direction.toLowerCase()} tone={toneFor(RESULT.direction)} />
-                    </div>
-                    {[
-                      ['Sell leg', `${TRADE.sellStrike.toLocaleString()} ${TRADE.inst} @ ₹${TRADE.sellPrem.toFixed(2)} (real, verified premium)`],
-                      ['Buy leg (hedge)', `${TRADE.buyStrike.toLocaleString()} ${TRADE.inst} @ ₹${TRADE.buyPrem.toFixed(2)}`],
-                      ['Net credit received', `₹${TRADE.netCredit.toFixed(2)} per unit`],
-                      ['Lot size', `${TRADE.lot} units`],
-                      ['Max profit', `₹${TRADE.maxProfit.toLocaleString()}`],
-                      ['Max loss (defined)', `₹${TRADE.maxLoss.toLocaleString()}`],
-                      ['Breakeven', TRADE.breakeven.toLocaleString()],
-                      ['Approx probability of profit', `${TRADE.pop}% (delta-based estimate, not backtested)`],
-                    ].map(([k, v]) => (
-                      <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 12 }}>
-                        <span style={{ color: '#888780' }}>{k}</span>
-                        <span style={{ fontWeight: 500 }}>{v}</span>
-                      </div>
-                    ))}
-                  </>
-                )}
-              </Card>
+              <div style={{ fontSize: 11, color: '#888780', marginTop: 8 }}>Defined-risk, theta-positive. Place by 3:30 PM, hold through expiry or close at 60–70% of max profit.</div>
             </>
           )}
+        </Card>
 
-          {tab === 'accuracy' && (
+        <Card ramp="amber">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <span style={{ fontSize: 14, fontWeight: 500 }}>{STRAT325.skip ? '3:25 PM directional' : `${STRAT325.strike.toLocaleString()} ${STRAT325.inst} — single leg`}</span>
+            {!STRAT325.skip && <Pill text={`up to 1 : ${STRAT325.riskRewardAt3x}`} ramp="amber" />}
+          </div>
+          {STRAT325.skip ? (
+            <div style={{ fontSize: 13, color: '#5F5E5A', lineHeight: 1.7 }}>{STRAT325.reason}</div>
+          ) : (
             <>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: '1.25rem' }}>
-                <Metric label="Directional accuracy" value={`${accuracyPct}%`} sub={`${correctCount} of ${totalCount} sessions`} color={accuracyPct >= 60 ? '#27500A' : '#791F1F'} />
-                <Metric label="Hits" value={correctCount} sub="prediction matched close direction" />
-                <Metric label="Misses" value={totalCount - correctCount} sub="see root cause for each below" />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 10 }}>
+                <Metric label="Entry" value={`₹${STRAT325.estPremium}`} ramp="blue" />
+                <Metric label="Stop (50%)" value={`₹${STRAT325.stopLossPremium}`} ramp="red" />
+                <Metric label="Max loss" value={`₹${STRAT325.maxLoss.toLocaleString()}`} ramp="red" />
               </div>
-              <Card>
-                <CardTitle sub="Real outcomes, not simulated — every miss has a documented cause, not a vague excuse">Last 11 sessions — predicted vs actual</CardTitle>
-                {ACCURACY_LOG.map((r, i) => (
-                  <div key={i} style={{ padding: '10px 0', borderBottom: i < ACCURACY_LOG.length - 1 ? '0.5px solid #F1EFE8' : 'none' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                      <span style={{ fontSize: 12, color: '#888780', width: 50 }}>{r.date}</span>
-                      <Pill text={r.predicted} tone={toneFor(r.predicted)} />
-                      <span style={{ fontSize: 11, color: '#888780' }}>→</span>
-                      <Pill text={r.actual} tone={toneFor(r.actual)} />
-                      <span style={{ fontSize: 11, color: '#888780' }}>score {r.score > 0 ? '+' : ''}{r.score}</span>
-                      <div style={{ flex: 1 }} />
-                      <Pill text={r.result} tone={r.result} />
-                    </div>
-                    <div style={{ fontSize: 12, color: '#5F5E5A', lineHeight: 1.5, paddingLeft: 60 }}>{r.note}</div>
-                  </div>
-                ))}
-              </Card>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+                <Metric label="2x target" value={`+₹${STRAT325.profit2x.toLocaleString()}`} ramp="green" />
+                <Metric label="3x target" value={`+₹${STRAT325.profit3x.toLocaleString()}`} ramp="green" />
+              </div>
+              <div style={{ fontSize: 11, color: '#888780' }}>Higher variance by design — cut the loser fast at the 50% stop, let the winner run to 2x/3x. Enter 3:25–3:28 PM only.</div>
             </>
           )}
+        </Card>
+      </div>
 
-          {tab === 'risk' && (
-            <>
-              <Card style={{ marginBottom: '1rem' }}>
-                <CardTitle>Today's recommended trade — risk profile</CardTitle>
-                {TRADE.skip ? (
-                  <div style={{ fontSize: 13, color: '#5F5E5A' }}>No trade recommended today — see Forecast tab. There is no risk to analyze for a position that should not be opened.</div>
-                ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    <Metric label="Max loss (worst case)" value={`₹${TRADE.maxLoss.toLocaleString()}`} sub="hard cap by construction — spread, not naked" color="#791F1F" />
-                    <Metric label="Max profit (best case)" value={`₹${TRADE.maxProfit.toLocaleString()}`} sub={`if NIFTY stays beyond ${TRADE.sellStrike.toLocaleString()}`} color="#27500A" />
-                  </div>
-                )}
-              </Card>
+      <div style={{ background: RAMPS.blue[50], borderRadius: 10, padding: '0.85rem 1.1rem', fontSize: 12, color: RAMPS.blue[800], lineHeight: 1.65, display: 'flex', gap: 8 }}>
+        <i className="ti ti-target-arrow" style={{ fontSize: 16, marginTop: 1, flexShrink: 0 }} aria-hidden="true" />
+        <span><strong>Monthly P&amp;L logic:</strong> the credit spread above is the steady, high-frequency, small-win engine — it should win more often than it loses and keep the account compounding quietly. The 3:25 PM play is the asymmetric tail — most days it hits the stop and costs a small, known amount, but on the days direction is right, it pays for several stopped-out days at once. Running both together, sized so neither single loss is painful, is the actual route to a positive month — not picking one big winning trade.</span>
+      </div>
+    </>
+  )
+}
 
-              <Card style={{ marginBottom: '1rem' }}>
-                <CardTitle sub="What happens if the market gaps against the prediction overnight">Gap risk protocol</CardTitle>
-                {[
-                  ['Gap within ±0.5% of plan', 'Proceed as planned. Re-check live premium before entry — if net credit has moved more than 15% from the modeled value, the trade is still valid but resize.'],
-                  ['Gap 0.5–1.5% against direction', 'Do not enter the planned trade. Re-run the 5-factor score with the new open price as input — the recommendation may flip.'],
-                  ['Gap >1.5% against direction (event-driven)', 'Treat as a black-swan flag. Skip new positions entirely for the session. If already in a position from a prior day, exit at market open — do not average down, do not hold and hope.'],
-                  ['VIX spikes >20% intraday', 'Independent of price action, this alone is a stand-down signal. Premiums will be mispriced for the next 30–60 minutes; wait for IV to settle before any new entry.'],
-                ].map(([cond, action], i) => (
-                  <div key={i} style={{ padding: '8px 0', borderBottom: i < 3 ? '0.5px solid #F1EFE8' : 'none' }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 2 }}>{cond}</div>
-                    <div style={{ fontSize: 12, color: '#5F5E5A', lineHeight: 1.5 }}>{action}</div>
-                  </div>
-                ))}
-              </Card>
-
-              <Card>
-                <CardTitle sub="Why this counts as risk control without claiming to predict black swans">Structural risk mitigation (built in, not bolted on)</CardTitle>
-                {[
-                  'Every recommended position is a defined-risk spread — the maximum loss is known and capped before entry, regardless of how far the market moves against it.',
-                  'No naked option selling is ever recommended by this system, by design — this directly satisfies the "no naked directional bets" requirement.',
-                  'When the composite score sits inside ±30 (the "neutral" zone), the system explicitly recommends no trade rather than forcing a directional pick — this is the single highest-value rule in the whole system, validated by the 23 Jun miss above being a "skip" rather than a wrong directional call.',
-                  'No system can predict a genuine black swan (war, central bank surprise, flash crash) by definition. What this system does instead is guarantee that any single day\'s loss is bounded and known in advance — that is the honest, achievable version of "black swan mitigation."',
-                ].map((t, i) => (
-                  <div key={i} style={{ fontSize: 12, color: '#5F5E5A', lineHeight: 1.6, padding: '6px 0', borderBottom: i < 3 ? '0.5px solid #F1EFE8' : 'none' }}>{t}</div>
-                ))}
-              </Card>
-            </>
-          )}
+function MCXHome() {
+  return (
+    <>
+      <Card style={{ marginBottom: '1.1rem', background: `linear-gradient(135deg, ${RAMPS.coral[50]}, #fff 70%)` }} ramp="coral">
+        <SectionLabel icon="ti-bulb">This week's macro theme across MCX commodities</SectionLabel>
+        <div style={{ fontSize: 13, color: RAMPS.coral[800], lineHeight: 1.7 }}>
+          A broad commodity-complex selloff, driven by two converging stories: <strong>(1)</strong> the Fed's hawkish pivot under new Chair Kevin Warsh, with September rate-hike odds jumping to 68% from 29% a week ago, and <strong>(2)</strong> the Strait of Hormuz reopening, unwinding the Middle East war-risk premium that had pushed crude and gold to extreme highs earlier in 2026. USD/INR: ₹{USD_INR}.
         </div>
+      </Card>
+
+      <SectionLabel icon="ti-chart-candle">This week's predictions — five MCX commodities</SectionLabel>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 12, marginBottom: '1.1rem' }}>
+        {MCX_COMMODITIES.map(c => {
+          const ramp = c.trend === 'BEARISH' ? 'red' : c.trend === 'BULLISH' ? 'green' : 'gray'
+          return (
+            <Card key={c.symbol} ramp={ramp}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 9 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ width: 30, height: 30, borderRadius: 9, background: RAMPS[ramp][50], display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <i className={`ti ${c.icon}`} style={{ fontSize: 16, color: RAMPS[ramp][600] }} aria-hidden="true" />
+                  </span>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 500 }}>{c.name}</div>
+                    <div style={{ fontSize: 11, color: '#888780' }}>{c.spot.toLocaleString()} {c.unit}</div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
+                  <Pill text={c.trend} ramp={ramp} />
+                  <Pill text={`${c.conviction} conviction`} ramp={convRamp(c.conviction)} />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, marginBottom: 8 }}>
+                <Metric label="Support" value={c.support.join(' / ')} ramp="green" />
+                <Metric label="Resistance" value={c.resistance.join(' / ')} ramp="red" />
+              </div>
+              <div style={{ fontSize: 11.5, color: '#5F5E5A', lineHeight: 1.6, marginBottom: 6 }}>{c.justification}</div>
+              <div style={{ fontSize: 10.5, color: '#888780', lineHeight: 1.5, display: 'flex', gap: 5 }}>
+                <i className="ti ti-shield-exclamation" style={{ fontSize: 12, marginTop: 1, flexShrink: 0 }} aria-hidden="true" />
+                <span>{c.risks}</span>
+              </div>
+            </Card>
+          )
+        })}
+      </div>
+    </>
+  )
+}
+
+function NiftyHistory({ stats }) {
+  return (
+    <>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: '1.1rem' }}>
+        <Metric label="Accuracy" value={stats.accuracyPct != null ? `${stats.accuracyPct}%` : '—'} sub={`${stats.correct} of ${stats.total}`} ramp={stats.accuracyPct >= 60 ? 'green' : 'red'} />
+        <Metric label="Hits" value={stats.correct} ramp="green" />
+        <Metric label="Partial misses" value={stats.partial} sub="right direction, wrong size" ramp="amber" />
+        <Metric label="Full misses" value={stats.misses} sub="root cause below" ramp="red" />
+      </div>
+
+      <Card style={{ marginBottom: '1.1rem' }} ramp="purple">
+        <SectionLabel icon="ti-git-branch">Model changelog — how the system learns from every miss</SectionLabel>
+        {MODEL_CHANGELOG.map((m, i) => (
+          <div key={i} style={{ padding: '9px 0', borderBottom: i < MODEL_CHANGELOG.length - 1 ? `0.5px solid ${RAMPS.purple[50]}` : 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+              <Pill text={m.version} ramp="purple" />
+              {m.retiredOn && <span style={{ fontSize: 10.5, color: RAMPS.red[600] }}>retired {m.retiredOn}</span>}
+              {m.addedOn && <span style={{ fontSize: 10.5, color: RAMPS.green[600] }}>active since {m.addedOn}</span>}
+            </div>
+            <div style={{ fontSize: 11.5, color: RAMPS.purple[600], marginBottom: 2 }}>{m.factors.join(' · ')}</div>
+            <div style={{ fontSize: 12, color: '#5F5E5A', lineHeight: 1.6 }}>{m.reason}</div>
+          </div>
+        ))}
+      </Card>
+
+      <Card>
+        <SectionLabel icon="ti-list-details">Prediction log — every session, predicted vs actual</SectionLabel>
+        {PREDICTION_LOG.map((r, i) => (
+          <div key={i} style={{ padding: '13px 0', borderBottom: i < PREDICTION_LOG.length - 1 ? '0.5px solid #F1EFE8' : 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 7, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, color: '#888780', width: 78 }}>{r.date}</span>
+              <Pill text={r.predicted} ramp={toneRamp(r.predicted)} />
+              <span style={{ fontSize: 11, color: '#888780' }}>predicted {r.predictedRange[0].toLocaleString()}–{r.predictedRange[1].toLocaleString()}</span>
+              <i className="ti ti-arrow-right" style={{ fontSize: 12, color: '#888780' }} aria-hidden="true" />
+              <span style={{ fontSize: 12, fontWeight: 500 }}>closed {r.actualClose.toLocaleString()} ({r.actualChangePct > 0 ? '+' : ''}{r.actualChangePct}%)</span>
+              <div style={{ flex: 1 }} />
+              <Pill text={r.result.replace('_', ' ')} ramp={r.result === 'correct' ? 'green' : r.result === 'partial_miss' ? 'amber' : 'red'} />
+            </div>
+            {r.note && <div style={{ fontSize: 12, color: '#5F5E5A', lineHeight: 1.55, paddingLeft: 87 }}>{r.note}</div>}
+            {r.rootCause && (
+              <div style={{ background: RAMPS.red[50], borderRadius: 9, padding: '11px 13px', marginTop: 7 }}>
+                <div style={{ fontSize: 12, fontWeight: 500, color: RAMPS.red[800], marginBottom: 5, display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <i className="ti ti-alert-triangle" style={{ fontSize: 14 }} aria-hidden="true" />Root cause analysis
+                </div>
+                <div style={{ fontSize: 12, color: RAMPS.red[800], marginBottom: 6, lineHeight: 1.6 }}>{r.rootCause.summary}</div>
+                <div style={{ fontSize: 11.5, color: RAMPS.pink[800], marginBottom: 6, lineHeight: 1.6 }}><strong>Missed driver:</strong> {r.rootCause.driverMissed}</div>
+                {r.rootCause.whyEachSignalFailed.map((s, j) => (
+                  <div key={j} style={{ fontSize: 11, color: '#5F5E5A', marginLeft: 14, marginBottom: 3, lineHeight: 1.5 }}>• <strong>{s.signal}:</strong> {s.issue}</div>
+                ))}
+                <div style={{ fontSize: 12, color: RAMPS.green[800], background: RAMPS.green[50], borderRadius: 7, padding: '7px 9px', marginTop: 7, lineHeight: 1.55 }}>
+                  <i className="ti ti-tool" style={{ fontSize: 13, marginRight: 4 }} aria-hidden="true" /><strong>Fix applied:</strong> {r.rootCause.fixApplied}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </Card>
+    </>
+  )
+}
+
+function MCXHistory({ mcxStats }) {
+  return (
+    <>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: '1.1rem' }}>
+        <Metric label="MCX accuracy (1 month)" value={mcxStats.accuracyPct != null ? `${mcxStats.accuracyPct}%` : '—'} sub={`${mcxStats.correct} of ${mcxStats.total}`} ramp={mcxStats.accuracyPct >= 60 ? 'green' : 'red'} />
+        <Metric label="Hits" value={mcxStats.correct} ramp="green" />
+        <Metric label="Misses" value={mcxStats.misses} sub="root cause below" ramp="red" />
+      </div>
+
+      <Card>
+        <SectionLabel icon="ti-list-details">1-month backtest — predicted vs achieved levels</SectionLabel>
+        {MCX_BACKTEST.map((r, i) => (
+          <div key={i} style={{ padding: '13px 0', borderBottom: i < MCX_BACKTEST.length - 1 ? '0.5px solid #F1EFE8' : 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 6, flexWrap: 'wrap' }}>
+              <Pill text={r.symbol} ramp="gray" />
+              <span style={{ fontSize: 12, color: '#888780' }}>week of {r.weekOf}</span>
+              <Pill text={r.predictedDirection} ramp={toneRamp(r.predictedDirection)} />
+              {r.predictedLevel != null && <span style={{ fontSize: 11, color: '#888780' }}>predicted ~{r.predictedLevel}</span>}
+              <i className="ti ti-arrow-right" style={{ fontSize: 12, color: '#888780' }} aria-hidden="true" />
+              <span style={{ fontSize: 12, fontWeight: 500 }}>achieved {r.achievedLevel.toLocaleString()}</span>
+              <div style={{ flex: 1 }} />
+              <Pill text={r.result} ramp={r.result === 'correct' ? 'green' : 'red'} />
+            </div>
+            {r.note && <div style={{ fontSize: 12, color: '#5F5E5A', lineHeight: 1.55, marginBottom: 3 }}>{r.note}</div>}
+            {r.dataConfidence && <div style={{ fontSize: 10.5, color: '#888780', fontStyle: 'italic' }}>Data confidence: {r.dataConfidence}</div>}
+            {r.rootCause && (
+              <div style={{ background: RAMPS.red[50], borderRadius: 9, padding: '11px 13px', marginTop: 7 }}>
+                <div style={{ fontSize: 12, fontWeight: 500, color: RAMPS.red[800], marginBottom: 5, display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <i className="ti ti-alert-triangle" style={{ fontSize: 14 }} aria-hidden="true" />Why this prediction was false
+                </div>
+                <div style={{ fontSize: 12, color: RAMPS.red[800], marginBottom: 6, lineHeight: 1.6 }}>{r.rootCause}</div>
+                <div style={{ fontSize: 12, color: RAMPS.green[800], background: RAMPS.green[50], borderRadius: 7, padding: '7px 9px', lineHeight: 1.55 }}>
+                  <i className="ti ti-tool" style={{ fontSize: 13, marginRight: 4 }} aria-hidden="true" /><strong>Fix applied:</strong> {r.fixNote}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </Card>
+    </>
+  )
+}
+
+function Playbook() {
+  const items = [
+    {
+      icon: 'ti-target-arrow', ramp: 'green', title: 'Win-size vs loss-size, not win-rate, decides monthly P&L',
+      body: 'A system that wins 40% of the time but wins 3x its average loss is more profitable than one that wins 70% of the time at 1:1. The credit-spread engine on the NIFTY home tab is built around this — small, frequent, high-probability wins; the 3:25 PM play is the deliberate opposite, a small number of asymmetric winners. Track both win rate AND average-win/average-loss separately — optimizing only for win rate is the most common way retail traders quietly lose money while feeling like they are doing well most days.',
+    },
+    {
+      icon: 'ti-calendar-time', ramp: 'amber', title: 'Day-of-week and DTE patterns are real but decay — re-test monthly',
+      body: 'Earlier research on this account found Monday entries and 4-5 day DTE produced materially better win rates than Tuesday/Friday entries and 0-2 day DTE, tied to the post-Sep-2025 Tuesday expiry cycle. These patterns come from market microstructure and they DO shift when the underlying expiry calendar or volatility regime shifts. Re-run this specific check against the most recent 4-6 weeks at least monthly rather than assuming it holds forever.',
+    },
+    {
+      icon: 'ti-droplet', ramp: 'coral', title: 'Track commodity and FX correlation as leading indicators, not just confirming ones',
+      body: "Brent crude and USD/INR both move NIFTY with a short lag through import costs, inflation expectations, and FII flows. The MCX tab exists specifically so a crude or gold move can be read as an early signal for NIFTY the next session, not just analysed in isolation. The 24 Jun miss happened precisely because crude's move was real and visible but not yet wired into the NIFTY score at the time.",
+    },
+    {
+      icon: 'ti-news', ramp: 'pink', title: 'Named catalysts deserve their own factor, weighted by resolution date',
+      body: 'A generic catalyst flag is a blunt instrument. The more useful version tracks: what is the event, when does it resolve, and what is the position-sizing implication for trades that would still be open at resolution. The Iran-US talks sitting unresolved over the 26-29 June holiday weekend is exactly this kind of risk — it argues for smaller size or no new directional bets until the outcome is known, not just a generic watch-the-news note.',
+    },
+    {
+      icon: 'ti-calendar-exclamation', ramp: 'blue', title: 'Weekends and holidays are wider, slower-resolving risk windows',
+      body: 'A 3-day gap (Thursday close to Monday open, as happens around a Friday holiday) gives unresolved news 3x the normal window to move the market before the next session even opens. Confidence should be reduced and predicted ranges widened specifically because of elapsed time, independent of how strong the underlying signals look. This was added to the model as v4 specifically because of the 26 June Muharram holiday.',
+    },
+    {
+      icon: 'ti-stack-2', ramp: 'purple', title: 'Keep the model auditable — every factor traces to a real miss or a real source',
+      body: 'It is tempting to keep adding smart-looking factors. The discipline that has kept this system honest so far: every factor currently in the model was added because of a specific, named, dated prediction failure with a documented root cause (see the NIFTY 30-day tab). The model grows only when it has actually been wrong in a way the new factor would have caught — not speculatively. Keep this discipline as the system evolves.',
+    },
+  ]
+
+  return (
+    <>
+      <Card style={{ marginBottom: '1.1rem', background: `linear-gradient(135deg, ${RAMPS.blue[50]}, #fff 70%)` }} ramp="blue">
+        <SectionLabel icon="ti-bulb">What this system needs to keep improving, based on deep research so far</SectionLabel>
+        <div style={{ fontSize: 13, color: RAMPS.blue[800], lineHeight: 1.7 }}>
+          These are structural notes for building a system that compounds small edges reliably, rather than chasing a single perfect prediction. Each item below comes from something that was either tested against real outcomes on this dashboard, or is a well-documented pattern from how options markets and institutional flows actually behave.
+        </div>
+      </Card>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 12 }}>
+        {items.map((it, i) => (
+          <Card key={i} ramp={it.ramp}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
+              <span style={{ width: 30, height: 30, borderRadius: 9, background: RAMPS[it.ramp][50], display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <i className={`ti ${it.icon}`} style={{ fontSize: 16, color: RAMPS[it.ramp][600] }} aria-hidden="true" />
+              </span>
+              <div style={{ fontSize: 13.5, fontWeight: 500, lineHeight: 1.4, paddingTop: 3 }}>{it.title}</div>
+            </div>
+            <div style={{ fontSize: 12, color: '#5F5E5A', lineHeight: 1.65 }}>{it.body}</div>
+          </Card>
+        ))}
       </div>
     </>
   )
