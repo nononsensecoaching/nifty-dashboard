@@ -3,7 +3,13 @@ import Head from 'next/head'
 import { MODEL_VERSION, MODEL_CHANGELOG, PREDICTION_LOG, getAccuracyStats, build325Strategy } from '../lib/learning'
 import { MCX_COMMODITIES, MCX_BACKTEST, USD_INR, getMCXAccuracyStats, getTradableCommodities } from '../lib/mcx'
 import { buildStrategies } from '../lib/strategy'
+import {
+  TRADE_HISTORY_META, STRATEGY_SCORECARD, DTE_PATTERN, DOW_PATTERN,
+  PREMIUM_ZONE_PATTERN, BULL_PUT_SPREAD_WIDTH_PATTERN, TOP_LOSSES, TOP_WINS,
+  BIG_LOSS_FINGERPRINT, MONTHLY_TREND, HARD_RULES,
+} from '../lib/tradeHistory'
 import { buildEvidenceChain, CURRENT_OI_SNAPSHOT } from '../lib/oiSignals'
+import { PSEUDO_SIGNALS } from '../lib/pseudoSignals'
 import { buildHorizons } from '../lib/horizons'
 
 const FALLBACK_DATA = {
@@ -13,16 +19,17 @@ const FALLBACK_DATA = {
   vix: 13.05,
   vixPrev: 13.94,
   pcr: 1.177,
-  fiiNet: -1541.08,
-  diiNet: 2715.17,
-  crudePct: -3.74,
-  catalystNote: 'Iran-US Switzerland talks easing; "mostly agreed" terms reported by Axios/White House officials',
+  fiiNet: 383.76,
+  diiNet: 5747.75,
+  crudePct: -4.34,
+  catalystNote: 'Iran fired drones at Strait of Hormuz 26 Jun (ceasefire violation), but crude still fell 4.34% same session — market reads it as contained, not a fresh escalation. US-Iran talks: 60-day roadmap agreed 21-22 Jun, implementation details still being worked out.',
   support: 24000,
   resistance: 24200,
   maxPain: 24100,
   isLive: false,
   isWeekendGap: true,
   nextSessionLabel: 'Monday 29 Jun 2026',
+  nextExpiryDte: 4,
   gapDays: 3,
 }
 
@@ -38,7 +45,7 @@ const GLOBAL_INDICES = [
   { label: 'DAX', value: 24671.22, chgPct: -1.29, region: 'Europe' },
   { label: 'CAC 40', value: 8384.87, chgPct: -0.55, region: 'Europe' },
   { label: 'CBOE VIX (US)', value: 18.41, chgPct: -2.54, region: 'Vol' },
-  { label: 'India VIX', value: 13.05, chgPct: -2.54, region: 'Vol' },
+  { label: 'India VIX', value: 13.05, chgPct: -6.38, region: 'Vol' },
 ]
 
 const FACTOR_META = {
@@ -224,7 +231,7 @@ export default function Dashboard() {
   }
 
   const RESULT = computeScoreV5(data)
-  const STRATEGIES = buildStrategies(RESULT.direction, RESULT.confidence, data)
+  const STRATEGIES = buildStrategies(RESULT.direction, RESULT.confidence, data, data.nextExpiryDte)
   const STRAT325 = build325Strategy(RESULT.direction, data.niftyClose, RESULT.confidence)
   const HORIZONS = buildHorizons(RESULT.total, RESULT.direction, RESULT.confidence, data)
   const EVIDENCE = buildEvidenceChain(data)
@@ -237,6 +244,7 @@ export default function Dashboard() {
     { k: 'mcx-home', label: 'MCX', icon: 'ti-coin' },
     { k: 'nifty-history', label: 'NIFTY · 30-day', icon: 'ti-table' },
     { k: 'mcx-history', label: 'MCX · 30-day', icon: 'ti-table' },
+    { k: 'pattern-intel', label: 'Pattern Intelligence', icon: 'ti-microscope' },
     { k: 'playbook', label: 'Playbook', icon: 'ti-bulb' },
   ]
 
@@ -304,6 +312,8 @@ export default function Dashboard() {
           {tab === 'nifty-history' && <NiftyHistory stats={stats} />}
 
           {tab === 'mcx-history' && <MCXHistory mcxStats={mcxStats} />}
+
+          {tab === 'pattern-intel' && <PatternIntelligence />}
 
           {tab === 'playbook' && <Playbook />}
 
@@ -392,6 +402,18 @@ function NiftyHome({ data, RESULT, STRATEGIES, STRAT325, HORIZONS, EVIDENCE }) {
         </Card>
       </div>
 
+      <Card style={{ marginBottom: '1.1rem' }} ramp="pink">
+        <SectionLabel icon="ti-eye-exclamation" sub="Signals that look directional but are documented traps — checked fresh each time, not asserted blind">Pseudo-signal watch</SectionLabel>
+        {PSEUDO_SIGNALS.map(p => (
+          <div key={p.id} style={{ padding: '9px 0', borderBottom: p.id !== PSEUDO_SIGNALS[PSEUDO_SIGNALS.length - 1].id ? '0.5px solid #F1EFE8' : 'none' }}>
+            <div style={{ fontSize: 12.5, fontWeight: 500, marginBottom: 3 }}>{p.name}</div>
+            <div style={{ fontSize: 11.5, color: '#888780', marginBottom: 3, lineHeight: 1.5 }}><strong>Looks like:</strong> {p.trap}</div>
+            <div style={{ fontSize: 11.5, color: RAMPS.pink[600], marginBottom: 3, lineHeight: 1.5 }}><strong>Actually:</strong> {p.reality}</div>
+            <div style={{ fontSize: 11, color: RAMPS.green[600], lineHeight: 1.5 }}><i className="ti ti-shield-check" style={{ fontSize: 12, marginRight: 3 }} aria-hidden="true" />{p.rule}</div>
+          </div>
+        ))}
+      </Card>
+
       <Card style={{ marginBottom: '1.1rem' }}>
         <SectionLabel icon="ti-layers-intersect" sub={`PCR ${CURRENT_OI_SNAPSHOT.pcr} · Max pain ${CURRENT_OI_SNAPSHOT.maxPain.toLocaleString()} · As of ${CURRENT_OI_SNAPSHOT.asOf}`}>Option chain OI map</SectionLabel>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 7 }}>
@@ -410,6 +432,23 @@ function NiftyHome({ data, RESULT, STRATEGIES, STRAT325, HORIZONS, EVIDENCE }) {
       </Card>
 
       <SectionLabel icon="ti-target-arrow" sub="Ranked so you can see the real tradeoff: higher win-rate structures have a worse payoff ratio, and vice versa">Trade structures — ranked by win-size vs loss-size ratio</SectionLabel>
+
+      {STRATEGIES[0]?.dteWarning && (
+        <div style={{
+          background: STRATEGIES[0].dteWarning.level === 'critical' ? RAMPS.red[50] : RAMPS.green[50],
+          border: `1px solid ${STRATEGIES[0].dteWarning.level === 'critical' ? RAMPS.red[600] : RAMPS.green[600]}40`,
+          borderRadius: 10, padding: '0.75rem 1rem', marginBottom: '0.9rem', fontSize: 12,
+          color: STRATEGIES[0].dteWarning.level === 'critical' ? RAMPS.red[800] : RAMPS.green[800],
+          display: 'flex', gap: 8, alignItems: 'flex-start',
+        }}>
+          <i className={`ti ${STRATEGIES[0].dteWarning.level === 'critical' ? 'ti-alert-octagon' : 'ti-check'}`} style={{ fontSize: 16, marginTop: 1, flexShrink: 0 }} aria-hidden="true" />
+          <span>
+            <strong>{STRATEGIES[0].dteWarning.message}</strong>
+            {STRATEGIES[0].dteWarning.evidence && <span> {STRATEGIES[0].dteWarning.evidence}</span>}
+          </span>
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: '1.1rem' }}>
         {STRATEGIES.filter(s => !s.skip).sort((a, b) => b.ratio - a.ratio).map(s => (
           <Card key={s.id} ramp={s.isPrimary ? 'amber' : undefined} style={s.isPrimary ? { borderWidth: 2 } : {}}>
@@ -418,6 +457,11 @@ function NiftyHome({ data, RESULT, STRATEGIES, STRAT325, HORIZONS, EVIDENCE }) {
               {s.isPrimary && <Pill text="recommended today" ramp="amber" />}
             </div>
             <div style={{ fontSize: 10.5, color: '#888780', marginBottom: 8 }}>{s.shape}</div>
+            {s.expiryDate && (
+              <div style={{ marginBottom: 8 }}>
+                <Pill text={`Expiry: ${s.expiryDate} (DTE ${s.dte})`} ramp="blue" />
+              </div>
+            )}
             {s.legs.map((l, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, padding: '2px 0' }}>
                 <span><Pill text={l.action} ramp={l.action === 'BUY' ? 'green' : 'red'} /> {l.strike.toLocaleString()} {l.inst}</span>
@@ -663,6 +707,171 @@ function MCXHistory({ mcxStats }) {
             )}
           </div>
         ))}
+      </Card>
+    </>
+  )
+}
+
+function PatternIntelligence() {
+  const maxDtePnl = Math.max(...DTE_PATTERN.map(d => Math.abs(d.pnl)))
+  const maxDowPnl = Math.max(...DOW_PATTERN.map(d => Math.abs(d.pnl)))
+  const maxStratPnl = Math.max(...STRATEGY_SCORECARD.map(s => Math.abs(s.pnl)))
+
+  return (
+    <>
+      <Card style={{ marginBottom: '1.1rem', background: `linear-gradient(135deg, ${RAMPS.red[50]}, #fff 70%)` }} ramp="red">
+        <SectionLabel icon="ti-microscope" sub={`Source: ${TRADE_HISTORY_META.source} · ${TRADE_HISTORY_META.scope} · analysed ${TRADE_HISTORY_META.analysedOn}`}>
+          The single most important finding in your trading history
+        </SectionLabel>
+        <div style={{ fontSize: 14, color: RAMPS.red[800], lineHeight: 1.7, marginBottom: 10 }}>{BIG_LOSS_FINGERPRINT.summary}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+          <Metric label="Trades over ₹30k loss" value={BIG_LOSS_FINGERPRINT.count} ramp="red" />
+          <Metric label="Total damage" value={`₹${(BIG_LOSS_FINGERPRINT.totalDamage / 100000).toFixed(2)}L`} ramp="red" />
+          <Metric label="Were Iron Condor-style" value={`${BIG_LOSS_FINGERPRINT.ironCondorCount}/${BIG_LOSS_FINGERPRINT.count}`} ramp="amber" />
+          <Metric label="Were DTE 0-1" value={`${BIG_LOSS_FINGERPRINT.dte0or1Count}/${BIG_LOSS_FINGERPRINT.count}`} ramp="amber" />
+        </div>
+      </Card>
+
+      <SectionLabel icon="ti-shield-check" sub="Every rule below traces to a specific number in this tab — none are asserted without evidence">Hard rules the trade engine now enforces</SectionLabel>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 10, marginBottom: '1.1rem' }}>
+        {HARD_RULES.map(r => (
+          <Card key={r.id} ramp={r.severity === 'critical' ? 'red' : r.severity === 'high' ? 'amber' : 'blue'}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
+              <Pill text={r.severity} ramp={r.severity === 'critical' ? 'red' : r.severity === 'high' ? 'amber' : 'blue'} />
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 5, lineHeight: 1.4 }}>{r.rule}</div>
+            <div style={{ fontSize: 11.5, color: '#5F5E5A', lineHeight: 1.55 }}>{r.evidence}</div>
+          </Card>
+        ))}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: '1.1rem' }}>
+        <Card>
+          <SectionLabel icon="ti-calendar-time" sub="All strategies combined, NIFTY only">Win rate &amp; P&amp;L by days-to-expiry at entry</SectionLabel>
+          {DTE_PATTERN.map(d => {
+            const pos = d.pnl >= 0
+            const pct = Math.abs(d.pnl) / maxDtePnl * 100
+            return (
+              <div key={d.dte} style={{ marginBottom: 9 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
+                  <span style={{ fontWeight: 500 }}>DTE {d.dte} <span style={{ color: '#888780', fontWeight: 400 }}>({d.trades} trades, {d.winRatePct}% win)</span></span>
+                  <strong style={{ color: pos ? RAMPS.green[600] : RAMPS.red[600] }}>{pos ? '+' : ''}₹{(d.pnl / 1000).toFixed(0)}k</strong>
+                </div>
+                <div style={{ height: 7, background: '#F1EFE8', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ width: `${pct}%`, height: 7, background: pos ? RAMPS.green[600] : RAMPS.red[600], borderRadius: 4 }} />
+                </div>
+                <div style={{ fontSize: 10.5, color: '#888780', marginTop: 2 }}>{d.note}</div>
+              </div>
+            )
+          })}
+        </Card>
+
+        <Card>
+          <SectionLabel icon="ti-calendar-week" sub="All strategies combined, NIFTY only">Win rate &amp; P&amp;L by day of week entered</SectionLabel>
+          {DOW_PATTERN.map(d => {
+            const pos = d.pnl >= 0
+            const pct = Math.abs(d.pnl) / maxDowPnl * 100
+            return (
+              <div key={d.day} style={{ marginBottom: 9 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
+                  <span style={{ fontWeight: 500 }}>{d.day} <span style={{ color: '#888780', fontWeight: 400 }}>({d.trades} trades, {d.winRatePct}% win)</span></span>
+                  <strong style={{ color: pos ? RAMPS.green[600] : RAMPS.red[600] }}>{pos ? '+' : ''}₹{(d.pnl / 1000).toFixed(0)}k</strong>
+                </div>
+                <div style={{ height: 7, background: '#F1EFE8', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ width: `${pct}%`, height: 7, background: pos ? RAMPS.green[600] : RAMPS.red[600], borderRadius: 4 }} />
+                </div>
+              </div>
+            )
+          })}
+        </Card>
+      </div>
+
+      <Card style={{ marginBottom: '1.1rem' }}>
+        <SectionLabel icon="ti-chart-bar" sub="Every structure you actually used in 14 months, NIFTY only — sell-side structures (green) dominate, buy-side structures (red) lost 100% of the time">Strategy scorecard</SectionLabel>
+        {STRATEGY_SCORECARD.map(s => {
+          const pos = s.pnl >= 0
+          const pct = Math.abs(s.pnl) / maxStratPnl * 100
+          return (
+            <div key={s.strategy} style={{ marginBottom: 9 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
+                <span style={{ fontWeight: 500 }}>
+                  {s.strategy} <Pill text={s.type} ramp={s.type === 'sell' ? 'green' : s.type === 'buy' ? 'red' : 'gray'} />
+                  <span style={{ color: '#888780', fontWeight: 400 }}> ({s.trades} trades, {s.winRatePct}% win)</span>
+                </span>
+                <strong style={{ color: pos ? RAMPS.green[600] : RAMPS.red[600] }}>{pos ? '+' : ''}₹{(s.pnl / 1000).toFixed(0)}k</strong>
+              </div>
+              <div style={{ height: 7, background: '#F1EFE8', borderRadius: 4, overflow: 'hidden' }}>
+                <div style={{ width: `${pct}%`, height: 7, background: pos ? RAMPS.green[600] : RAMPS.red[600], borderRadius: 4 }} />
+              </div>
+            </div>
+          )
+        })}
+      </Card>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: '1.1rem' }}>
+        <Card ramp="red">
+          <SectionLabel icon="ti-trending-down" sub="The exact trades that drove the loss column above">Top losses</SectionLabel>
+          {TOP_LOSSES.slice(0, 6).map((t, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, padding: '5px 0', borderBottom: i < 5 ? '0.5px solid #F1EFE8' : 'none' }}>
+              <span style={{ color: '#5F5E5A' }}>{t.date} · DTE {t.dte} · {t.strategy.replace(/_/g, ' ')}</span>
+              <strong style={{ color: RAMPS.red[600] }}>₹{(t.pnl / 1000).toFixed(0)}k</strong>
+            </div>
+          ))}
+        </Card>
+        <Card ramp="green">
+          <SectionLabel icon="ti-trending-up" sub="The exact trades that drove the win column above">Top wins</SectionLabel>
+          {TOP_WINS.slice(0, 6).map((t, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, padding: '5px 0', borderBottom: i < 4 ? '0.5px solid #F1EFE8' : 'none' }}>
+              <span style={{ color: '#5F5E5A' }}>{t.date} · DTE {t.dte} · {t.strategy.replace(/_/g, ' ')}</span>
+              <strong style={{ color: RAMPS.green[600] }}>+₹{(t.pnl / 1000).toFixed(0)}k</strong>
+            </div>
+          ))}
+        </Card>
+      </div>
+
+      <Card style={{ marginBottom: '1.1rem' }}>
+        <SectionLabel icon="ti-receipt-rupee" sub="Average entry premium per trade combo, NIFTY only">Premium zone — where you actually make money</SectionLabel>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+          {PREMIUM_ZONE_PATTERN.map(p => (
+            <div key={p.zone} style={{ background: p.verdict === 'sweet-spot' ? RAMPS.green[50] : p.verdict === 'avoid' ? RAMPS.red[50] : RAMPS.gray[50], borderRadius: 9, padding: '10px 11px', textAlign: 'center' }}>
+              <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 4 }}>{p.zone}</div>
+              <div style={{ fontSize: 11, color: '#888780' }}>{p.trades} trades</div>
+              <div style={{ fontSize: 13, fontWeight: 500, marginTop: 4, color: p.pnl >= 0 ? RAMPS.green[600] : RAMPS.red[600] }}>{p.winRatePct}% win</div>
+              <div style={{ fontSize: 11.5, color: p.pnl >= 0 ? RAMPS.green[600] : RAMPS.red[600] }}>{p.pnl >= 0 ? '+' : ''}₹{(p.pnl / 1000).toFixed(0)}k</div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card style={{ marginBottom: '1.1rem' }} ramp="blue">
+        <SectionLabel icon="ti-ruler-2">Bull Put Spread width finding</SectionLabel>
+        <div style={{ fontSize: 13, color: RAMPS.blue[800], lineHeight: 1.7, marginBottom: 4 }}>{BULL_PUT_SPREAD_WIDTH_PATTERN.finding}</div>
+        <div style={{ fontSize: 12, color: RAMPS.blue[600], fontWeight: 500 }}>{BULL_PUT_SPREAD_WIDTH_PATTERN.recommendation}</div>
+      </Card>
+
+      <Card>
+        <SectionLabel icon="ti-calendar" sub="Monthly win rate and P&L across the full 14-month history">Monthly trend</SectionLabel>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid #E5E3DC' }}>
+                {['Month', 'Trades', 'Win %', 'P&L'].map(h => (
+                  <th key={h} style={{ textAlign: 'left', padding: '6px 10px', color: '#888780', fontWeight: 500, fontSize: 10.5, textTransform: 'uppercase' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {MONTHLY_TREND.map(m => (
+                <tr key={m.month} style={{ borderBottom: '0.5px solid #F1EFE8' }}>
+                  <td style={{ padding: '6px 10px' }}>{m.month}</td>
+                  <td style={{ padding: '6px 10px', color: '#888780' }}>{m.trades}</td>
+                  <td style={{ padding: '6px 10px' }}>{m.winRatePct}%</td>
+                  <td style={{ padding: '6px 10px', fontWeight: 500, color: m.pnl >= 0 ? RAMPS.green[600] : RAMPS.red[600] }}>{m.pnl >= 0 ? '+' : ''}₹{m.pnl.toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </Card>
     </>
   )
