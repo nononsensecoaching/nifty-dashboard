@@ -93,3 +93,4 @@ export default async function handler(req, res) {
   console.log('[daily-run]', JSON.stringify(snapshot))
   return res.status(200).json(snapshot)
 }
+
