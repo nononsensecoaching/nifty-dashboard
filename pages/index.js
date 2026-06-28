@@ -1,5 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import Head from 'next/head'
+import {
+  Activity, OctagonAlert, ArrowLeftRight, Radio, Landmark, Lightbulb, Calendar,
+  CalendarClock, CalendarX2, CalendarRange, CalendarDays, BarChart3,
+  CandlestickChart, PieChart, Check, PauseCircle, PlayCircle, Coins, Droplet,
+  Eye, EyeOff, Filter, Fingerprint, GitBranch, Info, Layers, ListChecks,
+  ListTree, Microscope, Minus, Newspaper, Circle, Dot, Receipt, RefreshCw,
+  Ruler, ShieldCheck, ShieldAlert, Layers2, Table, Target, Crosshair, Wrench,
+  TrendingDown, TrendingUp, Globe, TriangleAlert, ArrowRight,
+} from 'lucide-react'
 import { MODEL_VERSION, MODEL_CHANGELOG, PREDICTION_LOG, getAccuracyStats, build325Strategy } from '../lib/learning'
 import { MCX_COMMODITIES, MCX_BACKTEST, USD_INR, getMCXAccuracyStats, getTradableCommodities } from '../lib/mcx'
 import { buildStrategies } from '../lib/strategy'
@@ -148,7 +157,7 @@ function SectionLabel({ children, icon, sub }) {
   return (
     <div style={{ marginBottom: 10 }}>
       <div style={{ fontSize: 11, fontWeight: 500, color: '#888780', letterSpacing: '.05em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 6 }}>
-        {icon && <i className={`ti ${icon}`} style={{ fontSize: 13 }} aria-hidden="true" />}{children}
+        {icon && <Icon name={icon} size={13} />}{children}
       </div>
       {sub && <div style={{ fontSize: 11, color: '#888780', marginTop: 2 }}>{sub}</div>}
     </div>
@@ -174,7 +183,7 @@ function FactorRow({ f, isLast }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
         <span style={{ fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 7 }}>
           <span style={{ width: 24, height: 24, borderRadius: 7, background: RAMPS[meta.ramp][50], display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <i className={`ti ${meta.icon}`} style={{ fontSize: 13, color: RAMPS[meta.ramp][600] }} aria-hidden="true" />
+            <Icon name={meta.icon} size={13} style={{ color: RAMPS[meta.ramp][600] }} />
           </span>
           {f.name}
           {f.isDampener && <Pill text="dampener" ramp="amber" />}
@@ -185,6 +194,37 @@ function FactorRow({ f, isLast }) {
       <div style={{ fontSize: 11, color: '#888780', marginTop: 1, paddingLeft: 31 }}>{f.rule}</div>
     </div>
   )
+}
+
+// Icon system — switched from a webfont CDN (tabler-icons) to real,
+// bundled SVG components (lucide-react) after Cowork's verification
+// reported the webfont's glyphs were not rendering (empty icon-wrapper
+// circles), a documented, recurring issue with that exact CDN package
+// across multiple browsers (see GitHub tabler/tabler-icons issues #476,
+// #1327, #1415, #1452). SVG components bundled at build time cannot fail
+// to render the way a runtime font download can.
+const ICON_MAP = {
+  'ti-activity': Activity, 'ti-alert-octagon': OctagonAlert, 'ti-arrows-horizontal': ArrowLeftRight,
+  'ti-broadcast': Radio, 'ti-building-bank': Landmark, 'ti-bulb': Lightbulb, 'ti-calendar': Calendar,
+  'ti-calendar-event': CalendarClock, 'ti-calendar-exclamation': CalendarX2, 'ti-calendar-stats': CalendarRange,
+  'ti-calendar-time': CalendarClock, 'ti-calendar-week': CalendarDays, 'ti-chart-bar': BarChart3,
+  'ti-chart-candle': CandlestickChart, 'ti-chart-donut': PieChart, 'ti-check': Check,
+  'ti-clock-pause': PauseCircle, 'ti-clock-play': PlayCircle, 'ti-coin': Coins, 'ti-droplet': Droplet,
+  'ti-eye': Eye, 'ti-eye-exclamation': EyeOff, 'ti-filter': Filter, 'ti-fingerprint': Fingerprint,
+  'ti-git-branch': GitBranch, 'ti-info-circle': Info, 'ti-layers-intersect': Layers,
+  'ti-list-check': ListChecks, 'ti-list-details': ListTree, 'ti-microscope': Microscope,
+  'ti-minus': Minus, 'ti-news': Newspaper, 'ti-point': Circle, 'ti-point-filled': Dot,
+  'ti-receipt-rupee': Receipt, 'ti-refresh': RefreshCw, 'ti-ruler-2': Ruler,
+  'ti-shield-check': ShieldCheck, 'ti-shield-exclamation': ShieldAlert, 'ti-stack-2': Layers2,
+  'ti-table': Table, 'ti-target': Target, 'ti-target-arrow': Crosshair, 'ti-tool': Wrench,
+  'ti-trending-down': TrendingDown, 'ti-trending-up': TrendingUp, 'ti-world': Globe,
+  'ti-alert-triangle': TriangleAlert, 'ti-arrow-right': ArrowRight, 'ti-shield': ShieldCheck,
+}
+
+function Icon({ name, size = 14, style, ...rest }) {
+  const Cmp = ICON_MAP[name]
+  if (!Cmp) return null
+  return <Cmp size={size} style={{ display: 'inline-block', verticalAlign: 'middle', ...style }} aria-hidden="true" {...rest} />
 }
 
 function toneRamp(dir) { return dir === 'BULL' ? 'green' : dir === 'BEAR' ? 'red' : 'gray' }
@@ -253,7 +293,6 @@ export default function Dashboard() {
       <Head>
         <title>NIFTY + MCX prediction system</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.47.0/iconfont/tabler-icons.min.css" />
       </Head>
 
       <div style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', background: '#F7F6F3', minHeight: '100vh', paddingBottom: '3rem' }}>
@@ -262,7 +301,7 @@ export default function Dashboard() {
           <div style={{ maxWidth: 1080, margin: '0 auto', padding: '0 1.5rem', display: 'flex', alignItems: 'center', height: 58, gap: 18 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
               <div style={{ width: 32, height: 32, borderRadius: 9, background: RAMPS[toneRamp(RESULT.direction)][600], display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <i className={`ti ${RESULT.direction === 'BULL' ? 'ti-trending-up' : RESULT.direction === 'BEAR' ? 'ti-trending-down' : 'ti-minus'}`} style={{ fontSize: 18, color: '#fff' }} aria-hidden="true" />
+                <Icon name={RESULT.direction === 'BULL' ? 'ti-trending-up' : RESULT.direction === 'BEAR' ? 'ti-trending-down' : 'ti-minus'} size={18} style={{ color: '#fff' }} />
               </div>
               <div>
                 <div style={{ fontSize: 15, fontWeight: 500, lineHeight: 1.2 }}>NIFTY + MCX</div>
@@ -277,7 +316,7 @@ export default function Dashboard() {
                   background: tab === n.k ? '#fff' : 'transparent', color: tab === n.k ? '#2C2C2A' : '#888780',
                   display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap',
                 }}>
-                  <i className={`ti ${n.icon}`} style={{ fontSize: 14 }} aria-hidden="true" />{n.label}
+                  <Icon name={n.icon} size={14} />{n.label}
                 </button>
               ))}
             </nav>
@@ -293,13 +332,13 @@ export default function Dashboard() {
             display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap',
           }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <i className={`ti ${data.isLive ? 'ti-broadcast' : 'ti-clock-pause'}`} style={{ fontSize: 14 }} aria-hidden="true" />
+              <Icon name={data.isLive ? 'ti-broadcast' : 'ti-clock-pause'} size={14} />
               <strong>{data.isLive ? 'Live' : 'Last known'}</strong> — {data.asOf}
               {data.isWeekendGap && <Pill text={`${data.gapDays}-day gap to ${data.nextSessionLabel}`} ramp="amber" />}
               {fetchError && <span style={{ opacity: 0.8 }}> · {fetchError}</span>}
             </span>
             <button onClick={fetchLive} disabled={loading} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 7, border: '0.5px solid currentColor', background: 'transparent', color: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, opacity: 0.85 }}>
-              <i className="ti ti-refresh" style={{ fontSize: 13 }} aria-hidden="true" />{loading ? 'refreshing…' : 'refresh now'}
+              <Icon name="ti-refresh" size={13} />{loading ? 'refreshing…' : 'refresh now'}
             </button>
           </div>
 
@@ -334,7 +373,7 @@ function NiftyHome({ data, RESULT, STRATEGIES, STRAT325, HORIZONS, EVIDENCE }) {
           <div>
             <SectionLabel icon="ti-calendar-event">Next session forecast · {data.nextSessionLabel}</SectionLabel>
             <div style={{ fontSize: 30, fontWeight: 500, color: r[800], display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-              <i className={`ti ${RESULT.direction === 'BULL' ? 'ti-trending-up' : RESULT.direction === 'BEAR' ? 'ti-trending-down' : 'ti-arrows-horizontal'}`} style={{ fontSize: 30 }} aria-hidden="true" />
+              <Icon name={RESULT.direction === 'BULL' ? 'ti-trending-up' : RESULT.direction === 'BEAR' ? 'ti-trending-down' : 'ti-arrows-horizontal'} size={30} />
               {RESULT.direction === 'BULL' ? 'Bullish bias' : RESULT.direction === 'BEAR' ? 'Bearish bias' : 'Neutral — range-bound'}
             </div>
             <div style={{ fontSize: 13, color: '#5F5E5A' }}>Score {RESULT.total > 0 ? '+' : ''}{RESULT.total}/100 · predicted range <strong style={{ color: '#2C2C2A' }}>{data.support.toLocaleString()}–{data.resistance.toLocaleString()}</strong></div>
@@ -390,7 +429,7 @@ function NiftyHome({ data, RESULT, STRATEGIES, STRAT325, HORIZONS, EVIDENCE }) {
           {EVIDENCE.map((e, i) => (
             <div key={i} style={{ padding: '9px 0', borderBottom: i < EVIDENCE.length - 1 ? '0.5px solid #F1EFE8' : 'none' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7 }}>
-                <i className="ti ti-point-filled" style={{ fontSize: 9, color: RAMPS.purple[600], marginTop: 5, flexShrink: 0 }} aria-hidden="true" />
+                <Icon name="ti-point-filled" size={9} style={{ color: RAMPS.purple[600], marginTop: 5, flexShrink: 0 }} />
                 <div>
                   <div style={{ fontSize: 12.5, fontWeight: 500 }}>{e.dot}</div>
                   <div style={{ fontSize: 11.5, color: '#5F5E5A', lineHeight: 1.5, marginTop: 1 }}>{e.reading}</div>
@@ -409,7 +448,7 @@ function NiftyHome({ data, RESULT, STRATEGIES, STRAT325, HORIZONS, EVIDENCE }) {
             <div style={{ fontSize: 12.5, fontWeight: 500, marginBottom: 3 }}>{p.name}</div>
             <div style={{ fontSize: 11.5, color: '#888780', marginBottom: 3, lineHeight: 1.5 }}><strong>Looks like:</strong> {p.trap}</div>
             <div style={{ fontSize: 11.5, color: RAMPS.pink[600], marginBottom: 3, lineHeight: 1.5 }}><strong>Actually:</strong> {p.reality}</div>
-            <div style={{ fontSize: 11, color: RAMPS.green[600], lineHeight: 1.5 }}><i className="ti ti-shield-check" style={{ fontSize: 12, marginRight: 3 }} aria-hidden="true" />{p.rule}</div>
+            <div style={{ fontSize: 11, color: RAMPS.green[600], lineHeight: 1.5 }}><Icon name="ti-shield-check" size={12} style={{ marginRight: 3 }} />{p.rule}</div>
           </div>
         ))}
       </Card>
@@ -441,7 +480,7 @@ function NiftyHome({ data, RESULT, STRATEGIES, STRAT325, HORIZONS, EVIDENCE }) {
           color: STRATEGIES[0].dteWarning.level === 'critical' ? RAMPS.red[800] : RAMPS.green[800],
           display: 'flex', gap: 8, alignItems: 'flex-start',
         }}>
-          <i className={`ti ${STRATEGIES[0].dteWarning.level === 'critical' ? 'ti-alert-octagon' : 'ti-check'}`} style={{ fontSize: 16, marginTop: 1, flexShrink: 0 }} aria-hidden="true" />
+          <Icon name={STRATEGIES[0].dteWarning.level === 'critical' ? 'ti-alert-octagon' : 'ti-check'} size={16} style={{ marginTop: 1, flexShrink: 0 }} />
           <span>
             <strong>{STRATEGIES[0].dteWarning.message}</strong>
             {STRATEGIES[0].dteWarning.evidence && <span> {STRATEGIES[0].dteWarning.evidence}</span>}
@@ -505,7 +544,7 @@ function NiftyHome({ data, RESULT, STRATEGIES, STRAT325, HORIZONS, EVIDENCE }) {
       </Card>
 
       <div style={{ background: RAMPS.blue[50], borderRadius: 10, padding: '0.85rem 1.1rem', fontSize: 12, color: RAMPS.blue[800], lineHeight: 1.65, display: 'flex', gap: 8 }}>
-        <i className="ti ti-info-circle" style={{ fontSize: 16, marginTop: 1, flexShrink: 0 }} aria-hidden="true" />
+        <Icon name="ti-info-circle" size={16} style={{ marginTop: 1, flexShrink: 0 }} />
         <span><strong>How to use the three trade structures above:</strong> they are the same view expressed at three different win-rate/payoff tradeoffs, not three independent recommendations to all take. The credit spread wins more often but loses more when wrong. The debit spreads win less often but the win pays for more than one loss. Running the amber-highlighted one as your default, sized so any single max loss is genuinely tolerable, is what survives a month where half your trades go against you.</span>
       </div>
     </>
@@ -546,7 +585,7 @@ function CommodityCard({ c }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 9 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ width: 30, height: 30, borderRadius: 9, background: RAMPS[ramp][50], display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <i className={`ti ${c.icon}`} style={{ fontSize: 16, color: RAMPS[ramp][600] }} aria-hidden="true" />
+            <Icon name={c.icon} size={16} style={{ color: RAMPS[ramp][600] }} />
           </span>
           <div>
             <div style={{ fontSize: 14, fontWeight: 500 }}>{c.name}</div>
@@ -564,7 +603,7 @@ function CommodityCard({ c }) {
       </div>
       <div style={{ fontSize: 11.5, color: '#5F5E5A', lineHeight: 1.6, marginBottom: 6 }}>{c.justification}</div>
       <div style={{ fontSize: 10.5, color: '#888780', lineHeight: 1.5, display: 'flex', gap: 5 }}>
-        <i className="ti ti-shield-exclamation" style={{ fontSize: 12, marginTop: 1, flexShrink: 0 }} aria-hidden="true" />
+        <Icon name="ti-shield-exclamation" size={12} style={{ marginTop: 1, flexShrink: 0 }} />
         <span>{c.risks}</span>
       </div>
     </Card>
@@ -642,7 +681,7 @@ function NiftyHistory({ stats }) {
                 <div key={j} style={{ fontSize: 11, color: '#5F5E5A', marginLeft: 14, marginBottom: 3, lineHeight: 1.5 }}>• <strong>{s.signal}:</strong> {s.issue}</div>
               ))}
               <div style={{ fontSize: 12, color: RAMPS.green[800], background: RAMPS.green[50], borderRadius: 7, padding: '7px 9px', marginTop: 7, lineHeight: 1.55 }}>
-                <i className="ti ti-tool" style={{ fontSize: 13, marginRight: 4 }} aria-hidden="true" /><strong>Fix applied:</strong> {r.rootCause.fixApplied}
+                <Icon name="ti-tool" size={13} style={{ marginRight: 4 }} /><strong>Fix applied:</strong> {r.rootCause.fixApplied}
               </div>
             </div>
           </div>
@@ -701,7 +740,7 @@ function MCXHistory({ mcxStats }) {
               <div style={{ background: RAMPS.red[50], borderRadius: 9, padding: '10px 12px', marginTop: 4 }}>
                 <div style={{ fontSize: 11.5, color: RAMPS.red[800], marginBottom: 5, lineHeight: 1.6 }}>{r.rootCause}</div>
                 <div style={{ fontSize: 11.5, color: RAMPS.green[800], background: RAMPS.green[50], borderRadius: 7, padding: '6px 9px', lineHeight: 1.5 }}>
-                  <i className="ti ti-tool" style={{ fontSize: 13, marginRight: 4 }} aria-hidden="true" /><strong>Fix:</strong> {r.fixNote}
+                  <Icon name="ti-tool" size={13} style={{ marginRight: 4 }} /><strong>Fix:</strong> {r.fixNote}
                 </div>
               </div>
             )}
@@ -919,7 +958,7 @@ function Playbook() {
           <Card key={i} ramp={it.ramp}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
               <span style={{ width: 30, height: 30, borderRadius: 9, background: RAMPS[it.ramp][50], display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <i className={`ti ${it.icon}`} style={{ fontSize: 16, color: RAMPS[it.ramp][600] }} aria-hidden="true" />
+                <Icon name={it.icon} size={16} style={{ color: RAMPS[it.ramp][600] }} />
               </span>
               <div style={{ fontSize: 13.5, fontWeight: 500, lineHeight: 1.4, paddingTop: 3 }}>{it.title}</div>
             </div>
