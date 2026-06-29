@@ -7,7 +7,7 @@ import {
   Eye, EyeOff, Filter, Fingerprint, GitBranch, Info, Layers, ListChecks,
   ListTree, Microscope, Minus, Newspaper, Circle, Dot, Receipt, RefreshCw,
   Ruler, ShieldCheck, ShieldAlert, Layers2, Table, Target, Crosshair, Wrench,
-  TrendingDown, TrendingUp, Globe, TriangleAlert, ArrowRight,
+  TrendingDown, TrendingUp, Globe, TriangleAlert, ArrowRight, Database,
 } from 'lucide-react'
 import { MODEL_VERSION, MODEL_CHANGELOG, PREDICTION_LOG, getAccuracyStats, build325Strategy } from '../lib/learning'
 import { MCX_COMMODITIES, MCX_BACKTEST, USD_INR, getMCXAccuracyStats, getTradableCommodities } from '../lib/mcx'
@@ -20,11 +20,13 @@ import {
 import { buildEvidenceChain, CURRENT_OI_SNAPSHOT } from '../lib/oiSignals'
 import { PSEUDO_SIGNALS } from '../lib/pseudoSignals'
 import { buildHorizons } from '../lib/horizons'
+import { NEWS_WATCH } from '../lib/newsWatch'
 
 const FALLBACK_DATA = {
   asOf: '25 Jun 2026 close (fallback — Fri 26 Jun was a market holiday)',
   niftyClose: 24056.00,
   niftyPrev: 24021.65,
+  giftNifty: 24081,
   vix: 13.05,
   vixPrev: 13.94,
   pcr: 1.177,
@@ -43,6 +45,7 @@ const FALLBACK_DATA = {
 }
 
 const GLOBAL_INDICES = [
+  { label: 'GIFT Nifty', value: 24081, chgPct: 0.06, region: 'India', isGift: true },
   { label: 'S&P 500', value: 7354.02, chgPct: -0.05, region: 'US' },
   { label: 'Dow Jones', value: 51876.11, chgPct: -0.09, region: 'US' },
   { label: 'Nasdaq', value: 25297.62, chgPct: -0.24, region: 'US' },
@@ -53,12 +56,13 @@ const GLOBAL_INDICES = [
   { label: 'FTSE 100', value: 10508.02, chgPct: -0.21, region: 'Europe' },
   { label: 'DAX', value: 24671.22, chgPct: -1.29, region: 'Europe' },
   { label: 'CAC 40', value: 8384.87, chgPct: -0.55, region: 'Europe' },
-  { label: 'CBOE VIX (US)', value: 18.41, chgPct: -2.54, region: 'Vol' },
-  { label: 'India VIX', value: 13.05, chgPct: -6.38, region: 'Vol' },
+  { label: 'CBOE VIX (US)', value: 18.41, chgPct: -2.54, region: 'Vol', invertColor: true },
+  { label: 'India VIX', value: 13.05, chgPct: -6.38, region: 'Vol', invertColor: true },
 ]
 
 const FACTOR_META = {
   'Realized trend':     { icon: 'ti-trending-up', ramp: 'blue' },
+  'GIFT Nifty gap':     { icon: 'ti-world', ramp: 'blue' },
   'India VIX':          { icon: 'ti-activity', ramp: 'purple' },
   'PCR (fresh series)': { icon: 'ti-chart-donut', ramp: 'coral' },
   'Crude oil (Brent)':  { icon: 'ti-droplet', ramp: 'coral' },
@@ -75,6 +79,13 @@ function computeScoreV5(d) {
   const s1 = chgPct > 0.5 ? 25 : chgPct < -0.5 ? -25 : Math.round(chgPct * 30)
   score += s1
   factors.push({ name: 'Realized trend', detail: `${chgPct.toFixed(2)}% close-over-close`, score: s1, rule: 'Last full session move' })
+
+  const giftGapPct = d.giftNifty != null ? ((d.giftNifty - d.niftyClose) / d.niftyClose) * 100 : 0
+  const s1b = d.giftNifty != null ? (giftGapPct > 0.3 ? 15 : giftGapPct < -0.3 ? -15 : Math.round(giftGapPct * 20)) : 0
+  if (d.giftNifty != null) {
+    score += s1b
+    factors.push({ name: 'GIFT Nifty gap', detail: `${d.giftNifty.toLocaleString()} vs ${d.niftyClose.toLocaleString()} close (${giftGapPct > 0 ? '+' : ''}${giftGapPct.toFixed(2)}%)`, score: s1b, rule: 'Overnight futures gap — the earliest live read on tomorrow\'s open' })
+  }
 
   const s2 = d.vix < 14 ? 15 : d.vix < 16 ? 10 : d.vix < 19 ? -5 : -15
   score += s2
@@ -122,14 +133,20 @@ const RAMPS = {
   gray:   { 50: '#F1EFE8', 100: '#D3D1C7', 600: '#5F5E5A', 800: '#444441' },
 }
 
-function heatColor(chgPct) {
-  const a = Math.min(Math.abs(chgPct) / 4, 1)
-  if (chgPct > 0.05) {
+function heatColor(chgPct, invert = false) {
+  // VIX (and any other "fear gauge") is the opposite of every other index:
+  // a FALL in VIX is bullish for equities, so its color must invert —
+  // green for falling, red for rising. Bug fixed 28 Jun 2026: a falling
+  // India VIX was showing red right next to a bullish verdict, directly
+  // contradicting the call it sat beside.
+  const effective = invert ? -chgPct : chgPct
+  const a = Math.min(Math.abs(effective) / 4, 1)
+  if (effective > 0.05) {
     if (a > 0.6) return { bg: '#97C459', fg: '#173404' }
     if (a > 0.25) return { bg: '#C0DD97', fg: '#27500A' }
     return { bg: '#EAF3DE', fg: '#3B6D11' }
   }
-  if (chgPct < -0.05) {
+  if (effective < -0.05) {
     if (a > 0.6) return { bg: '#E24B4A', fg: '#501313' }
     if (a > 0.25) return { bg: '#F09595', fg: '#791F1F' }
     return { bg: '#FCEBEB', fg: '#A32D2D' }
@@ -218,7 +235,7 @@ const ICON_MAP = {
   'ti-shield-check': ShieldCheck, 'ti-shield-exclamation': ShieldAlert, 'ti-stack-2': Layers2,
   'ti-table': Table, 'ti-target': Target, 'ti-target-arrow': Crosshair, 'ti-tool': Wrench,
   'ti-trending-down': TrendingDown, 'ti-trending-up': TrendingUp, 'ti-world': Globe,
-  'ti-alert-triangle': TriangleAlert, 'ti-arrow-right': ArrowRight, 'ti-shield': ShieldCheck,
+  'ti-alert-triangle': TriangleAlert, 'ti-arrow-right': ArrowRight, 'ti-shield': ShieldCheck, 'ti-database': Database,
 }
 
 function Icon({ name, size = 14, style, ...rest }) {
@@ -376,7 +393,7 @@ function NiftyHome({ data, RESULT, STRATEGIES, STRAT325, HORIZONS, EVIDENCE }) {
               <Icon name={RESULT.direction === 'BULL' ? 'ti-trending-up' : RESULT.direction === 'BEAR' ? 'ti-trending-down' : 'ti-arrows-horizontal'} size={30} />
               {RESULT.direction === 'BULL' ? 'Bullish bias' : RESULT.direction === 'BEAR' ? 'Bearish bias' : 'Neutral — range-bound'}
             </div>
-            <div style={{ fontSize: 13, color: '#5F5E5A' }}>Score {RESULT.total > 0 ? '+' : ''}{RESULT.total}/100 · predicted range <strong style={{ color: '#2C2C2A' }}>{data.support.toLocaleString()}–{data.resistance.toLocaleString()}</strong></div>
+            <div style={{ fontSize: 13, color: '#5F5E5A' }}>Score {RESULT.total > 0 ? '+' : ''}{RESULT.total}/100</div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
             <Pill text={`${RESULT.confidence} confidence`} ramp={convRamp(RESULT.confidence)} />
@@ -385,10 +402,18 @@ function NiftyHome({ data, RESULT, STRATEGIES, STRAT325, HORIZONS, EVIDENCE }) {
         </div>
       </Card>
 
+      <SectionLabel icon="ti-target" sub="The actual numbers behind the direction call above — support, resistance, and max pain for the next session">Predicted market levels — {data.nextSessionLabel}</SectionLabel>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: '1.1rem' }}>
+        <Metric label="Last close" value={data.niftyClose.toLocaleString()} ramp="gray" />
+        <Metric label="Predicted support" value={data.support.toLocaleString()} sub="downside floor for tomorrow" ramp="green" />
+        <Metric label="Predicted resistance" value={data.resistance.toLocaleString()} sub="upside ceiling for tomorrow" ramp="red" />
+        <Metric label="Max pain (this expiry)" value={data.maxPain.toLocaleString()} sub="gravitational pull near expiry" ramp="amber" />
+      </div>
+
       <SectionLabel icon="ti-world" sub="Color intensity scales with magnitude of move — darker means a stronger signal in that direction">Global indices heatmap (overnight)</SectionLabel>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 7, marginBottom: '1.1rem' }}>
         {GLOBAL_INDICES.map(g => {
-          const hc = heatColor(g.chgPct)
+          const hc = heatColor(g.chgPct, g.invertColor)
           return (
             <div key={g.label} style={{ background: hc.bg, borderRadius: 9, padding: '10px 12px' }}>
               <div style={{ fontSize: 10.5, color: hc.fg, opacity: 0.85, marginBottom: 2 }}>{g.label}</div>
@@ -441,6 +466,21 @@ function NiftyHome({ data, RESULT, STRATEGIES, STRAT325, HORIZONS, EVIDENCE }) {
         </Card>
       </div>
 
+      <Card style={{ marginBottom: '1.1rem' }} ramp="blue">
+        <SectionLabel icon="ti-news" sub="Cross-checked across multiple sources before use — each item's impact is read separately from its headline">News &amp; catalyst watch</SectionLabel>
+        {NEWS_WATCH.map(n => (
+          <div key={n.id} style={{ padding: '9px 0', borderBottom: n.id !== NEWS_WATCH[NEWS_WATCH.length - 1].id ? '0.5px solid #F1EFE8' : 'none' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 3 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 500, flex: 1 }}>{n.headline}</div>
+              <Pill text={n.impact} ramp={n.impact === 'BULLISH' ? 'green' : n.impact === 'CAUTION' || n.impact === 'WATCH' ? 'amber' : 'gray'} />
+            </div>
+            <div style={{ fontSize: 11, color: '#888780', marginBottom: 2 }}>{n.when}</div>
+            <div style={{ fontSize: 11.5, color: '#5F5E5A', lineHeight: 1.5, marginBottom: 2 }}>{n.impactNote}</div>
+            <div style={{ fontSize: 10, color: '#B4B2A9' }}>Source: {n.source}</div>
+          </div>
+        ))}
+      </Card>
+
       <Card style={{ marginBottom: '1.1rem' }} ramp="pink">
         <SectionLabel icon="ti-eye-exclamation" sub="Signals that look directional but are documented traps — checked fresh each time, not asserted blind">Pseudo-signal watch</SectionLabel>
         {PSEUDO_SIGNALS.map(p => (
@@ -489,7 +529,7 @@ function NiftyHome({ data, RESULT, STRATEGIES, STRAT325, HORIZONS, EVIDENCE }) {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: '1.1rem' }}>
-        {STRATEGIES.filter(s => !s.skip).sort((a, b) => b.ratio - a.ratio).map(s => (
+        {STRATEGIES.filter(s => !s.skip).sort((a, b) => (b.ratio ?? 0) - (a.ratio ?? 0)).map(s => (
           <Card key={s.id} ramp={s.isPrimary ? 'amber' : undefined} style={s.isPrimary ? { borderWidth: 2 } : {}}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
               <div style={{ fontSize: 13, fontWeight: 500 }}>{s.name}</div>
@@ -503,17 +543,17 @@ function NiftyHome({ data, RESULT, STRATEGIES, STRAT325, HORIZONS, EVIDENCE }) {
             )}
             {s.legs.map((l, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, padding: '2px 0' }}>
-                <span><Pill text={l.action} ramp={l.action === 'BUY' ? 'green' : 'red'} /> {l.strike.toLocaleString()} {l.inst}</span>
+                <span><Pill text={l.action} ramp={l.action === 'BUY' ? 'green' : 'red'} /> {l.strike.toLocaleString()} {l.inst}{l.qty > 1 ? ` × ${l.qty} lots` : ''}</span>
                 <span style={{ color: '#888780' }}>₹{l.premium}</span>
               </div>
             ))}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 8, marginBottom: 8 }}>
-              <Metric label="Max profit" value={`₹${s.maxProfit.toLocaleString()}`} ramp="green" />
-              <Metric label="Max loss" value={`₹${s.maxLoss.toLocaleString()}`} ramp="red" />
+              <Metric label={s.isRatioSpread ? 'Profit beyond far strike' : 'Max profit'} value={s.maxProfit != null ? `₹${s.maxProfit.toLocaleString()}` : 'Re-accelerates, uncapped'} ramp="green" />
+              <Metric label={s.isRatioSpread ? 'Max loss (at far strike)' : 'Max loss'} value={`₹${s.maxLoss.toLocaleString()}`} ramp="red" />
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, marginBottom: 6 }}>
               <span style={{ color: '#888780' }}>Ratio</span>
-              <strong>{s.ratio}x {s.ratio > 1 ? '(profit > loss)' : '(loss > profit)'}</strong>
+              <strong>{s.ratio != null ? `${s.ratio}x ${s.ratio > 1 ? '(profit > loss)' : '(loss > profit)'}` : 'Not fixed — depends how far price moves past the far strike'}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, marginBottom: 8 }}>
               <span style={{ color: '#888780' }}>Est. probability of profit</span>
@@ -602,10 +642,18 @@ function CommodityCard({ c }) {
         <Metric label="Resistance" value={c.resistance.join(' / ')} ramp="red" />
       </div>
       <div style={{ fontSize: 11.5, color: '#5F5E5A', lineHeight: 1.6, marginBottom: 6 }}>{c.justification}</div>
-      <div style={{ fontSize: 10.5, color: '#888780', lineHeight: 1.5, display: 'flex', gap: 5 }}>
+      <div style={{ fontSize: 10.5, color: '#888780', lineHeight: 1.5, display: 'flex', gap: 5, marginBottom: 8 }}>
         <Icon name="ti-shield-exclamation" size={12} style={{ marginTop: 1, flexShrink: 0 }} />
         <span>{c.risks}</span>
       </div>
+      {c.tradeIdea && (
+        <div style={{ background: '#F7F6F3', borderRadius: 8, padding: '8px 10px', borderLeft: `3px solid ${RAMPS[ramp][600]}` }}>
+          <div style={{ fontSize: 11, fontWeight: 500, marginBottom: 4 }}>{c.tradeIdea.strategy}</div>
+          <div style={{ fontSize: 10.5, color: '#5F5E5A', marginBottom: 2 }}><Pill text="SELL" ramp="red" /> {c.tradeIdea.sellStrike}</div>
+          <div style={{ fontSize: 10.5, color: '#5F5E5A', marginBottom: 4 }}><Pill text="BUY" ramp="green" /> {c.tradeIdea.buyStrike}</div>
+          <div style={{ fontSize: 10, color: '#888780', lineHeight: 1.5 }}>{c.tradeIdea.rationale}</div>
+        </div>
+      )}
     </Card>
   )
 }
@@ -632,7 +680,7 @@ function NiftyHistory({ stats }) {
               </tr>
             </thead>
             <tbody>
-              {PREDICTION_LOG.map((r, i) => {
+              {[...PREDICTION_LOG].reverse().map((r, i) => {
                 const isHoliday = r.result === 'holiday'
                 const pnl = r.tradeOutcome?.pnl
                 return (
@@ -694,14 +742,17 @@ function NiftyHistory({ stats }) {
 function MCXHistory({ mcxStats }) {
   return (
     <>
+      <div style={{ background: RAMPS.amber[50], borderRadius: 10, padding: '0.7rem 1rem', marginBottom: '1.1rem', fontSize: 12, color: RAMPS.amber[800], lineHeight: 1.6 }}>
+        MCX tracking on this dashboard started 3 trading days ago (26-27 Jun 2026). The numbers below cover that real window only — they do not claim a longer history than actually exists. This will grow day by day, not be backfilled.
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: '1.1rem' }}>
-        <Metric label="MCX accuracy (1 month)" value={mcxStats.accuracyPct != null ? `${mcxStats.accuracyPct}%` : '—'} sub={`${mcxStats.correct} of ${mcxStats.total}`} ramp={mcxStats.accuracyPct >= 60 ? 'green' : 'red'} />
+        <Metric label="MCX accuracy (since tracking began)" value={mcxStats.accuracyPct != null ? `${mcxStats.accuracyPct}%` : '—'} sub={`${mcxStats.correct} of ${mcxStats.total}`} ramp={mcxStats.accuracyPct >= 60 ? 'green' : 'red'} />
         <Metric label="Hits" value={mcxStats.correct} ramp="green" />
         <Metric label="Misses" value={mcxStats.misses} sub="root cause below" ramp="red" />
       </div>
 
       <Card style={{ marginBottom: '1.1rem' }}>
-        <SectionLabel icon="ti-table">1-month backtest — predicted vs achieved levels, by commodity</SectionLabel>
+        <SectionLabel icon="ti-table">Backtest — predicted vs achieved levels, by commodity (most recent first)</SectionLabel>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
             <thead>
@@ -712,7 +763,7 @@ function MCXHistory({ mcxStats }) {
               </tr>
             </thead>
             <tbody>
-              {MCX_BACKTEST.map((r, i) => (
+              {[...MCX_BACKTEST].reverse().map((r, i) => (
                 <tr key={i} style={{ borderBottom: '0.5px solid #F1EFE8' }}>
                   <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>{r.weekOf}</td>
                   <td style={{ padding: '8px 10px' }}><Pill text={r.symbol} ramp="gray" /></td>
@@ -729,7 +780,7 @@ function MCXHistory({ mcxStats }) {
 
       <Card>
         <SectionLabel icon="ti-list-details">Notes &amp; root causes for each row</SectionLabel>
-        {MCX_BACKTEST.map((r, i) => (
+        {[...MCX_BACKTEST].reverse().map((r, i) => (
           <div key={i} style={{ padding: '11px 0', borderBottom: i < MCX_BACKTEST.length - 1 ? '0.5px solid #F1EFE8' : 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
               <Pill text={r.symbol} ramp="gray" /><span style={{ fontSize: 11, color: '#888780' }}>{r.weekOf}</span>
@@ -919,8 +970,12 @@ function PatternIntelligence() {
 function Playbook() {
   const items = [
     {
-      icon: 'ti-target-arrow', ramp: 'green', title: 'Win-size vs loss-size, not win-rate, decides monthly P&L',
-      body: 'A system that wins 40% of the time but wins 3x its average loss is more profitable than one that wins 70% of the time at 1:1. The dashboard now ranks every trade structure by this ratio explicitly, and shows the honest tradeoff: a credit spread\'s higher win-rate comes with a worse ratio, and the debit spreads\' better ratio comes with a lower win-rate. There is no structure that gives you both — anyone claiming otherwise is not accounting for one side of the trade.',
+      icon: 'ti-target-arrow', ramp: 'green', title: 'Win-size vs loss-size, not win-rate, decides monthly P&L — and the engine no longer recommends debit spreads to chase it',
+      body: 'A system that wins 40% of the time but wins 3x its average loss is more profitable than one that wins 70% of the time at 1:1. An earlier version of this dashboard tried to solve this with debit spreads (buying premium outright) — but the user\'s own 14-month trade history shows every buy-side structure they ever attempted lost 100% of the time across 8 trades. That contradiction has been fixed: debit spreads were removed entirely from the engine. The sell-side ratio spread (sell 1, buy 2 further out) is now the structure used when a profit-can-exceed-loss shape is wanted, because it keeps the position a net seller of premium throughout.',
+    },
+    {
+      icon: 'ti-database', ramp: 'red', title: 'Data sources — what is genuinely live, and what is not',
+      body: 'Be precise about this rather than implying more freshness than exists: NIFTY close, India VIX, and the option chain pull live from NSE\'s public endpoints when reachable (lib/nse.js) — this is the one genuinely live, auto-refreshing source. FII/DII figures, GIFT Nifty, global indices, crude oil, and all News & Catalyst Watch items are manually researched and verified against 2+ independent sources at the time they are added, then held as static fallback values until a future session refreshes them — they are not pulled from a live feed automatically. This dashboard does not have a paid multi-vendor data subscription; treat every non-NSE number as "verified as of its stated date," not "live right now," and re-verify anything market-moving before sizing a real trade on it.',
     },
     {
       icon: 'ti-calendar-time', ramp: 'amber', title: 'Holding longer has outperformed holding short in your own data',
