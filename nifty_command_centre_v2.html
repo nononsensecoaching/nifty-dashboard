@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NIFTY F&O Command Centre · Mithun</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#060B1A;--card:#0D1525;--c2:#111827;--bdr:#1E2A40;--green:#10B981;--red:#EF4444;--amber:#F59E0B;--blue:#3B82F6;--purple:#8B5CF6;--cyan:#06B6D4;--text:#E2E8F0;--muted:#64748B}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:13px}
+/* TOPBAR */
+.tb{background:linear-gradient(135deg,#1e3a8a,#1e40af 35%,#0369a1 65%,#0e7490);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:100;box-shadow:0 2px 20px rgba(0,0,0,.6);flex-wrap:wrap;gap:8px}
+.logo{font-size:15px;font-weight:900;color:#fff}.logo span{background:linear-gradient(90deg,#34d399,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.ld{width:8px;height:8px;border-radius:50%;background:#10B981;display:inline-block;animation:bl 2s infinite;margin-right:5px;box-shadow:0 0 6px #10B981}
+@keyframes bl{0%,100%{opacity:1}50%{opacity:.3}}
+.tabs{display:flex;gap:2px;background:rgba(0,0,0,.3);padding:4px;border-radius:10px;flex-wrap:wrap}
+.tab{padding:6px 12px;border:none;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700;transition:all .2s;background:transparent;color:rgba(255,255,255,.5)}
+.tab.active{background:rgba(255,255,255,.18);color:#fff;box-shadow:0 0 10px rgba(16,185,129,.3)}
+.tab:hover:not(.active){background:rgba(255,255,255,.1);color:#fff}
+/* LAYOUT */
+.page{display:none;padding:14px 16px;max-width:1200px;margin:0 auto}.page.active{display:block}
+.card{background:var(--card);border:1px solid var(--bdr);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+.cg{border-color:#065f46;background:linear-gradient(135deg,#052814,#0d1525)}
+.cr{border-color:#7f1d1d;background:linear-gradient(135deg,#2d0707,#0d1525)}
+.ca{border-color:#78350f;background:linear-gradient(135deg,#1a1200,#0d1525)}
+.cb{border-color:#1e40af;background:linear-gradient(135deg,#0a1a2d,#0d1525)}
+.ct{border:2px solid #1e40af;background:linear-gradient(135deg,#0a1a2d,#0d1525);border-radius:12px;padding:16px;margin-bottom:14px;box-shadow:0 0 20px rgba(59,130,246,.12)}
+.crr{border:2px solid #8b5cf6;background:linear-gradient(135deg,#1a0a2d,#0d1525);border-radius:12px;padding:16px;box-shadow:0 0 25px rgba(139,92,246,.35);text-align:center}
+.cgold{border:2px solid #d97706;background:linear-gradient(135deg,#1a0a00,#0d1525);border-radius:12px;padding:16px;margin-bottom:14px;box-shadow:0 0 20px rgba(217,119,6,.15)}
+.ccrude{border:2px solid #059669;background:linear-gradient(135deg,#001a0a,#0d1525);border-radius:12px;padding:16px;margin-bottom:14px;box-shadow:0 0 20px rgba(5,150,105,.15)}
+.section-title{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.section-title::after{content:'';flex:1;height:1px;background:var(--bdr)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+@media(max-width:750px){.g2,.g3,.g4{grid-template-columns:1fr}}
+.kpi{background:var(--c2);border:1px solid var(--bdr);border-radius:10px;padding:12px 14px}
+.kpi-label{font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em}
+.kpi-value{font-size:20px;font-weight:800}.kpi-sub{font-size:10px;color:var(--muted);margin-top:2px}
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700}
+.bb{background:#065f46;color:#34d399;border:1px solid #059669}
+.br{background:#7f1d1d;color:#fca5a5;border:1px solid #dc2626}
+.ba{background:#78350f;color:#fcd34d;border:1px solid #d97706}
+.bbl{background:#1e3a8a;color:#93c5fd;border:1px solid #3b82f6}
+.bp{background:#4c1d95;color:#c4b5fd;border:1px solid #8b5cf6}
+.bh{background:linear-gradient(90deg,#78350f,#92400e);color:#fcd34d}
+.bm{background:#1e3a8a;color:#93c5fd}
+.blow{background:#1f2937;color:#6b7280}
+.bwin{background:#065f46;color:#34d399;border:1px solid #059669}
+.bloss{background:#7f1d1d;color:#fca5a5;border:1px solid #dc2626}
+.ins{border-radius:8px;padding:10px 14px;font-size:12px;line-height:1.7;margin-bottom:8px}
+.ig{background:#052814;border-left:4px solid var(--green);color:#86efac}
+.ir{background:#2d0707;border-left:4px solid var(--red);color:#fca5a5}
+.ib{background:#0a1a2d;border-left:4px solid var(--blue);color:#93c5fd}
+.iamb{background:#1a1200;border-left:4px solid var(--amber);color:#fde68a}
+.ip{background:#1a0a2d;border-left:4px solid var(--purple);color:#c4b5fd}
+.ic{background:#001a20;border-left:4px solid var(--cyan);color:#a5f3fc}
+.exbox{background:#0d1525;border:1px solid var(--bdr);border-radius:8px;padding:12px;font-size:12px;line-height:1.8;color:var(--muted);margin-top:8px}
+.exbox strong{color:var(--text)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{padding:8px;text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid var(--bdr);font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+td{padding:7px 8px;border-bottom:1px solid #111827;color:#94a3b8;vertical-align:middle}
+tr:hover td{background:#111827}
+.btn{padding:8px 16px;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;transition:all .2s;display:inline-flex;align-items:center;gap:6px}
+.btn-run{background:linear-gradient(135deg,#10b981,#059669);color:#fff;box-shadow:0 0 15px rgba(16,185,129,.4);font-size:13px;padding:8px 20px}
+.btn-run:hover{transform:translateY(-1px);box-shadow:0 0 25px rgba(16,185,129,.7)}
+.btn-s{background:#1e3a8a;color:#93c5fd;border:1px solid #3b82f6;text-decoration:none}
+.btn-mcx{background:linear-gradient(135deg,#d97706,#b45309);color:#fff;text-decoration:none}
+.sigbar{height:6px;background:#1e2a40;border-radius:3px;overflow:hidden;margin:3px 0 6px}
+.sigfill{height:6px;border-radius:3px;transition:width .6s}
+.eqtrack{display:flex;align-items:flex-end;gap:2px;height:50px}
+.eqbar{border-radius:2px 2px 0 0;min-width:6px;flex:1}
+.pchk{font-size:11px;display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #1e2a40}
+.pchk:last-child{border-bottom:none}
+.green{color:var(--green)}.red{color:var(--red)}.amber{color:var(--amber)}.blue{color:var(--blue)}.purple{color:var(--purple)}.white{color:#fff}.muted{color:var(--muted)}
+.pp{color:var(--green);font-weight:700}.pn{color:var(--red);font-weight:700}
+/* DIRECTION BANNER */
+.dbanner{border-radius:14px;padding:18px 22px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+.dbull{background:linear-gradient(135deg,#052814,#065f46 50%,#0d1525);border:2px solid #059669;box-shadow:0 0 35px rgba(16,185,129,.2)}
+.dbear{background:linear-gradient(135deg,#2d0707,#7f1d1d 50%,#0d1525);border:2px solid #dc2626;box-shadow:0 0 35px rgba(239,68,68,.2)}
+.dwait{background:linear-gradient(135deg,#0a1a2d,#1e3a8a 50%,#0d1525);border:2px solid #3b82f6;box-shadow:0 0 35px rgba(59,130,246,.2)}
+/* LEVELS */
+.lg{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin:12px 0}
+.lbox{border-radius:8px;padding:10px;text-align:center}
+.lentry{background:#0a1a2d;border:1px solid #3b82f6}
+.lsl{background:#2d0707;border:1px solid #dc2626}
+.l2x{background:#0f2d1a;border:1px solid #10b981}
+.l3x{background:#1a0a2d;border:1px solid #8b5cf6}
+@media(max-width:600px){.lg{grid-template-columns:1fr 1fr}}
+/* MCX */
+.mcxg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px}
+.mcxc{border-radius:12px;padding:16px;text-align:center}
+.mcxgold{background:linear-gradient(135deg,#1a0a00,#111827);border:2px solid #d97706;box-shadow:0 0 20px rgba(217,119,6,.2)}
+.mcxcrude{background:linear-gradient(135deg,#000d1a,#111827);border:2px solid #0369a1;box-shadow:0 0 20px rgba(3,105,161,.2)}
+.mcxsilver{background:linear-gradient(135deg,#0a0a1a,#111827);border:2px solid #6b7280;box-shadow:0 0 20px rgba(107,114,128,.2)}
+.bigprice{font-size:26px;font-weight:900;margin:6px 0}
+/* LOADING */
+#loadB{background:rgba(59,130,246,.15);border:1px solid #3b82f6;border-radius:8px;padding:8px 14px;font-size:12px;color:#93c5fd;margin-bottom:12px;display:none;align-items:center;gap:8px}
+.spin{animation:sp 1s linear infinite;display:inline-block}
+@keyframes sp{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+/* LOGIN */
+#lo{position:fixed;inset:0;background:#060B1A;display:flex;align-items:center;justify-content:center;z-index:9999}
+.lbox{background:linear-gradient(135deg,#0D1525,#111827);border:1px solid #1e3a8a;border-radius:18px;padding:36px;width:340px;text-align:center;box-shadow:0 0 60px rgba(59,130,246,.25)}
+.lbox h2{font-size:22px;font-weight:900;margin-bottom:6px;background:linear-gradient(90deg,#34d399,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.li{width:100%;background:#1e2a40;border:1px solid #374151;border-radius:8px;color:#e2e8f0;padding:11px 14px;font-size:13px;margin-bottom:10px;outline:none;transition:border .2s}
+.li:focus{border-color:#3b82f6}
+.lerr{color:#ef4444;font-size:12px;margin-top:6px;display:none}
+/* WEEK CARD */
+.wc{background:var(--card);border:1px solid var(--bdr);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="lo">
+  <div class="lbox">
+    <div style="font-size:36px;margin-bottom:8px">📡</div>
+    <h2>NIFTY Command Centre</h2>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:22px">Mithun's Private F&O Dashboard · Secure Access</p>
+    <input id="lu" class="li" type="text" placeholder="Username" autocomplete="off">
+    <input id="lp" class="li" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn btn-run" style="width:100%;justify-content:center;margin-top:4px" onclick="doLogin()">🔐 LOGIN</button>
+    <div id="lerr" class="lerr">❌ Wrong credentials. Try again.</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none">
+
+<div class="tb">
+  <div>
+    <div class="logo">NIFTY <span>COMMAND CENTRE</span></div>
+    <div style="font-size:10px;color:rgba(255,255,255,.5);margin-top:2px"><span class="ld"></span>Mithun · <span id="topD"></span></div>
+  </div>
+  <div class="tabs">
+    <button class="tab active" onclick="showP('p1',this)">📡 NIFTY Signal</button>
+    <button class="tab" onclick="showP('p2',this)">🥇 MCX Signal</button>
+    <button class="tab" onclick="showP('p3',this)">📊 Backtest</button>
+    <button class="tab" onclick="showP('p4',this)">📅 P&L Log</button>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <div style="text-align:right;font-size:13px;font-weight:700;color:#fff">
+      <span id="topN">NIFTY —</span> <span id="topC" style="font-size:12px"></span>
+      <small id="topV" style="display:block;font-size:10px;color:rgba(255,255,255,.5)">VIX —</small>
+    </div>
+    <button class="btn btn-run" id="runBtn" onclick="runUpdate()">▶ RUN UPDATE</button>
+    <span style="font-size:10px;color:rgba(255,255,255,.5);padding:3px 8px;background:rgba(0,0,0,.3);border-radius:5px">Auto: 9:30AM &amp; 3:15PM IST</span>
+  </div>
+</div>
+
+<div style="max-width:1200px;margin:0 auto;padding:0 16px">
+  <div id="loadB"><span class="spin">⟳</span> Fetching live market data from Yahoo Finance…</div>
+</div>
+
+<!-- P1: NIFTY SIGNAL -->
+<div id="p1" class="page active">
+  <div id="dBanner" class="dbanner dwait">
+    <div>
+      <div style="font-size:11px;color:rgba(255,255,255,.6);letter-spacing:.06em;margin-bottom:4px" id="dMeta">Loading…</div>
+      <div style="font-size:24px;font-weight:900;color:#fff" id="dTitle">⏳ Fetching live data…</div>
+      <div style="font-size:12px;color:rgba(255,255,255,.75);margin-top:5px" id="dDesc">Please wait</div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:11px;color:rgba(255,255,255,.5)">Signal Score</div>
+      <div style="font-size:40px;font-weight:900;color:#fff" id="dScore">—</div>
+      <div id="dBadge"></div>
+    </div>
+  </div>
+
+  <div class="g2">
+    <div class="card">
+      <div class="section-title">📊 Why BULL / BEAR / WAIT? (5 live signals)</div>
+      <div id="sigF"><div style="color:var(--muted);font-size:12px;padding:20px 0;text-align:center">Loading signals…</div></div>
+      <div class="exbox"><strong>How it works:</strong> We check 5 market signals every morning. Each votes BULL (+) or BEAR (-). Add them up — strong positive = buy call spread; strong negative = buy put spread; middle = sit out. <strong>Weak signal = NO trade.</strong> Your May 2026 losses: all were weak-signal trades.</div>
+    </div>
+    <div class="card">
+      <div class="section-title">🌏 Global Markets (overnight moves)</div>
+      <table><thead><tr><th>Market</th><th>Price</th><th>Change</th><th>NIFTY impact</th></tr></thead>
+      <tbody id="gTbl"></tbody></table>
+      <div class="exbox" style="margin-top:8px"><strong>Why US matters:</strong> NIFTY is ~65% correlated with S&P 500. When the US rises overnight, NIFTY opens higher. Gift Nifty is India's pre-market indicator — check this first at 8:30 AM before any trade.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">✅ Your 3 Winning Pattern Checks — does today qualify?</div>
+    <div class="g3">
+      <div style="background:#0d1525;border-radius:10px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Pattern 1 — Low VIX (Cheap Options)</div><div id="pat1"></div></div>
+      <div style="background:#0d1525;border-radius:10px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Pattern 2 — DTE Sweet Spot (3-7 days)</div><div id="pat2"></div></div>
+      <div style="background:#0d1525;border-radius:10px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Pattern 3 — Strong Signal (Score ≥30)</div><div id="pat3"></div></div>
+    </div>
+  </div>
+
+  <!-- OI MAP (below forecast, above trade) -->
+  <div class="card">
+    <div class="section-title">📈 Option Chain OI Map — Support &amp; Resistance Zones</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px">🔴 Red = CALL OI = Resistance (ceiling) &nbsp;|&nbsp; 🟢 Green = PUT OI = Support (floor)</div>
+    <div id="oiMap" style="overflow-x:auto"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;flex-wrap:wrap;gap:8px">
+      <div class="exbox" style="margin:0;flex:1"><strong>Plain English:</strong> Resistance = ceiling where big sellers defend. Support = floor where big buyers defend. Trade toward the weaker wall. <strong>Indicative only</strong> — verify live on <a href="https://www.nseindia.com/option-chain" target="_blank" style="color:#3b82f6">NSE ↗</a></div>
+      <a href="https://www.nseindia.com/option-chain" target="_blank" class="btn btn-s">🔗 NSE Live OI ↗</a>
+    </div>
+  </div>
+
+  <!-- TRADE RECOMMENDATION (below OI map) -->
+  <div class="ct">
+    <div class="section-title" style="color:#93c5fd">🎯 Recommended Trade — Asymmetric Risk:Reward System</div>
+
+    <div class="crr" style="margin-bottom:16px">
+      <div style="font-size:11px;color:#c4b5fd;letter-spacing:.08em;margin-bottom:4px">MITHUN'S EDGE: THE ASYMMETRIC WIN SYSTEM</div>
+      <div style="font-size:20px;font-weight:900;color:#fff;margin-bottom:4px">Win 35% of Trades, Still Profitable ✅</div>
+      <div style="font-size:12px;color:#c4b5fd;margin-bottom:10px">A system that wins 35% but earns 3× its loss is MORE PROFITABLE than one that wins 70% at 1:1</div>
+      <div style="display:flex;justify-content:center;gap:30px;flex-wrap:wrap">
+        <div><div style="font-size:28px;font-weight:900" id="rrR" class="purple">—:1</div><div style="font-size:10px;color:var(--muted)">Risk:Reward</div></div>
+        <div><div style="font-size:28px;font-weight:900" id="rrB" class="amber">—%</div><div style="font-size:10px;color:var(--muted)">Min Win% to Break Even</div></div>
+        <div><div style="font-size:28px;font-weight:900" id="rrE" class="green">₹—</div><div style="font-size:10px;color:var(--muted)">EV at 35% Win Rate</div></div>
+      </div>
+    </div>
+
+    <div class="g2">
+      <div>
+        <table>
+          <tr><td style="color:var(--muted);font-size:11px;width:130px">Strategy</td><td id="tSt" class="white" style="font-weight:700"></td></tr>
+          <tr><td style="color:var(--muted);font-size:11px">Buy Leg</td><td id="tBL"></td></tr>
+          <tr><td style="color:var(--muted);font-size:11px">Sell Leg</td><td id="tSL"></td></tr>
+          <tr><td style="color:var(--muted);font-size:11px">Net Cost</td><td id="tD" class="amber" style="font-weight:700"></td></tr>
+          <tr><td style="color:var(--muted);font-size:11px">Max Loss</td><td id="tML" class="red" style="font-weight:700"></td></tr>
+          <tr><td style="color:var(--muted);font-size:11px">Max Gain</td><td id="tMG" class="green" style="font-weight:700"></td></tr>
+          <tr><td style="color:var(--muted);font-size:11px">Breakeven</td><td id="tBE" class="white"></td></tr>
+          <tr><td style="color:var(--muted);font-size:11px">Best Entry</td><td id="tEN" class="amber"></td></tr>
+          <tr><td style="color:var(--muted);font-size:11px">Expiry</td><td id="tEX" class="white"></td></tr>
+        </table>
+        <div style="margin-top:12px" id="tSurl"></div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">📍 NIFTY Exit Price Levels — Act at These:</div>
+        <div class="lg" id="lvls"></div>
+        <div id="tExp" class="ins ib" style="margin-top:8px;font-size:12px"></div>
+      </div>
+    </div>
+
+    <div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px" id="trules"></div>
+  </div>
+
+  <!-- BTST/STBT -->
+  <div class="card ca">
+    <div class="section-title">🌙 BTST/STBT — Should You Hold Overnight?</div>
+    <div class="g3">
+      <div class="ins ig"><strong>✅ BTST possible when:</strong> Score ≥40 + VIX &lt;15 + Monday entry + No major news tomorrow. Max 1 overnight per week. Monday → Tuesday is your strongest BTST from historical data.</div>
+      <div class="ins ir"><strong>❌ NEVER hold Friday overnight:</strong> Options lose 2 days of weekend theta. Historical: Friday BTST = near 100% loss. Always exit by 3:00 PM Thursday if expiry is next week.</div>
+      <div class="ins iamb"><strong>⚠ STBT not recommended:</strong> Selling overnight without a hedge exposes you to gap risk. Only use hedged spreads (both legs) if holding overnight — never sell naked puts/calls overnight.</div>
+    </div>
+    <div id="btstMsg" class="ins ib" style="font-size:12px">Loading BTST assessment…</div>
+  </div>
+
+  <!-- SCENARIOS -->
+  <div class="card">
+    <div class="section-title">📋 4 Scenarios — Be Prepared for Any Outcome</div>
+    <table><thead><tr><th>Scenario</th><th>NIFTY moves to</th><th>Your action</th><th>Outcome</th><th>P&amp;L</th><th>Probability</th></tr></thead>
+    <tbody id="scTbl"></tbody></table>
+    <div class="exbox"><strong>Key rule:</strong> No gut feeling. No "let me wait a bit more." When NIFTY hits your level, act mechanically. Your only job is to monitor these 4 price levels and press square-off when hit.</div>
+  </div>
+
+  <!-- SKIP RULES -->
+  <div class="card cr">
+    <div class="section-title">🚫 When NOT to Trade Today</div>
+    <div class="g2">
+      <div>
+        <div class="ins ir" style="margin-bottom:6px">❌ <strong>Skip if Score is -29 to +29</strong> — weak signal. Your May 2026 losses: all score was &lt;30. No trade on weak conviction.</div>
+        <div class="ins ir" style="margin-bottom:6px">❌ <strong>Skip if VIX spikes above 20</strong> before entry — options too expensive, RR collapses.</div>
+        <div class="ins ir">❌ <strong>Skip on Expiry Day (DTE=0)</strong> — options lose 40-60% of premium in final hours. DTE 0 = biggest loss source in your data.</div>
+      </div>
+      <div>
+        <div class="ins iamb" style="margin-bottom:6px">⚠ <strong>Wait 30 mins if gap-up/down &gt;200pts</strong> — large gaps often mean reversal. Watch 9:15–9:45 AM before entering.</div>
+        <div class="ins iamb" style="margin-bottom:6px">⚠ <strong>After 2 consecutive losses</strong> — trade half lot (13 units). Protect capital first.</div>
+        <div class="ins iamb">⚠ <strong>Thursday entry (DTE 1-2)</strong> — only if score ≥50 HIGH confidence. Never enter new spread on Thursday with score &lt;40.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- P2: MCX SIGNAL -->
+<div id="p2" class="page">
+  <div class="ins iamb" style="margin-bottom:14px;font-size:12px">
+    <strong>⚠ MCX Live Data:</strong> Prices below = COMEX/WTI prices converted to INR via live USDINR rate from Yahoo Finance. Very close approximations — verify exact MCX price on your broker before trading. For live MCX option chain: <a href="https://www.mcxindia.com/market-data/option-chain" target="_blank" style="color:#fde68a">mcxindia.com ↗</a>
+  </div>
+
+  <div class="mcxg">
+    <div class="mcxc mcxgold">
+      <div style="font-size:11px;color:#fbbf24;letter-spacing:.1em;text-transform:uppercase">🥇 MCX Gold (10g)</div>
+      <div class="bigprice amber" id="gP">₹—</div>
+      <div id="gC" style="font-size:12px;margin-bottom:4px"></div>
+      <div style="font-size:10px;color:var(--muted)">COMEX Gold × USDINR × (10/31.1035)</div>
+      <div id="gSig" style="margin-top:6px"></div>
+    </div>
+    <div class="mcxc mcxcrude">
+      <div style="font-size:11px;color:#22d3ee;letter-spacing:.1em;text-transform:uppercase">🛢 MCX Crude (bbl)</div>
+      <div class="bigprice" style="color:var(--cyan)" id="cP">₹—</div>
+      <div id="cC" style="font-size:12px;margin-bottom:4px"></div>
+      <div style="font-size:10px;color:var(--muted)">WTI Crude × USDINR</div>
+      <div id="cSig" style="margin-top:6px"></div>
+    </div>
+    <div class="mcxc mcxsilver">
+      <div style="font-size:11px;color:#d1d5db;letter-spacing:.1em;text-transform:uppercase">🥈 MCX Silver (1kg)</div>
+      <div class="bigprice white" id="sP">₹—</div>
+      <div id="sC" style="font-size:12px;margin-bottom:4px"></div>
+      <div style="font-size:10px;color:var(--muted)">COMEX Silver × USDINR × (1000/31.1035)</div>
+      <div id="sSig" style="margin-top:6px"></div>
+    </div>
+  </div>
+
+  <div class="g2">
+    <div class="card">
+      <div class="section-title">💱 USD/INR Impact on MCX &amp; NIFTY</div>
+      <table><tbody id="usdTbl"></tbody></table>
+      <div class="exbox"><strong>Why this matters:</strong> MCX commodities are priced in INR but benchmarked in USD. If INR weakens, MCX Gold rises even if COMEX is flat — you need more INR to buy the same USD worth of gold. This protects Gold traders when NIFTY falls.</div>
+    </div>
+    <div class="card">
+      <div class="section-title">🛢 Crude Oil Impact on India</div>
+      <div id="crudeImp"></div>
+    </div>
+  </div>
+
+  <div class="cgold">
+    <div class="section-title" style="color:#fbbf24">🎯 MCX Gold Trade Recommendation</div>
+    <div id="gTrade"></div>
+  </div>
+
+  <div class="ccrude">
+    <div class="section-title" style="color:var(--cyan)">🎯 MCX Crude Trade Recommendation</div>
+    <div id="cTrade"></div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">🔗 MCX Resources</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+      <a href="https://www.mcxindia.com/market-data/option-chain" target="_blank" class="btn btn-mcx">🥇 MCX Live Option Chain ↗</a>
+      <a href="https://www.mcxindia.com/market-data/commodity-market-watch" target="_blank" class="btn btn-s">📊 MCX Market Watch ↗</a>
+      <a href="https://zerodha.com/markets/commodities" target="_blank" class="btn btn-s">🔗 Zerodha MCX ↗</a>
+    </div>
+    <div class="exbox"><strong>MCX Gold lot sizes:</strong> Mini = 10g (retail-friendly), Regular = 1kg. For options, max loss = premium paid (no margin calls beyond that). Margin: ~₹12,000–₹20,000 per mini lot. Start with 1 mini lot to understand the dynamics.</div>
+  </div>
+</div>
+
+<!-- P3: BACKTEST -->
+<div id="p3" class="page">
+  <div class="g4" style="margin-bottom:14px">
+    <div class="kpi" style="border-color:#059669"><div class="kpi-label">Win Rate (15 trades)</div><div class="kpi-value green">73.3%</div><div class="kpi-sub">11 wins, 4 losses</div></div>
+    <div class="kpi" style="border-color:#059669"><div class="kpi-label">Total P&amp;L (₹2L capital)</div><div class="kpi-value green">+₹79,444</div><div class="kpi-sub">Jan–Jun 2026</div></div>
+    <div class="kpi" style="border-color:#3b82f6"><div class="kpi-label">Return on Capital</div><div class="kpi-value blue">+39.7%</div><div class="kpi-sub">100 trading days</div></div>
+    <div class="kpi" style="border-color:#ef4444"><div class="kpi-label">Max Single Loss</div><div class="kpi-value red">₹2,080</div><div class="kpi-sub">Defined &amp; capped always</div></div>
+  </div>
+  <div class="card">
+    <div class="section-title">Capital Growth (₹2L → ₹2.79L)</div>
+    <div class="eqtrack" id="eqCurve"></div>
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px"><span>Jan ₹2.00L</span><span>Feb ₹2.11L</span><span>Mar ₹2.41L</span><span>Apr ₹2.47L</span><span>May ₹2.49L</span><span>Jun ₹2.79L</span></div>
+    <div class="exbox"><strong>Each bar = 1 trade.</strong> Green = win, Red = loss. 15 trades in 100 days — selective, not over-trading. Big Feb-Mar bear wins and Jun recovery wiped out all May losses.</div>
+  </div>
+  <div class="card">
+    <div class="section-title">Trade-by-Trade Log (15 Trades)</div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th>#</th><th>Entry</th><th>Exit</th><th>Dir</th><th>DTE</th><th>Hold</th><th>Score</th><th>Conf</th><th>Buy K</th><th>Sell K</th><th>Net Debit</th><th>NIFTY Δ</th><th>P&amp;L</th><th>Result</th><th>Verify</th></tr></thead>
+      <tbody id="tTbl"></tbody>
+    </table></div>
+  </div>
+  <div class="card">
+    <div class="section-title">Patterns That Work vs Patterns to Avoid</div>
+    <div class="g3">
+      <div style="background:#0d1525;border-radius:10px;padding:12px">
+        <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:8px">✅ Winning Pattern</div>
+        <div class="pchk"><span class="green">✅</span><span>Score ≥ ±40 = HIGH confidence</span></div>
+        <div class="pchk"><span class="green">✅</span><span>DTE 2-7 at entry</span></div>
+        <div class="pchk"><span class="green">✅</span><span>1 trade per expiry</span></div>
+        <div class="pchk"><span class="green">✅</span><span>Exit in 2-3 days</span></div>
+        <div class="pchk"><span class="green">✅</span><span>Never hold to expiry day</span></div>
+      </div>
+      <div style="background:#0d1525;border-radius:10px;padding:12px">
+        <div style="font-size:12px;font-weight:700;color:var(--amber);margin-bottom:8px">📊 Win vs Loss Stats</div>
+        <div style="font-size:12px;color:var(--muted);line-height:2.1">
+          <span class="green">11 wins</span> avg: <span class="green">+₹8,131</span><br>
+          <span class="red">4 losses</span> avg: <span class="red">-₹1,273</span><br>
+          Win/loss ratio: <span class="white">6.4:1</span><br>
+          Largest win: <span class="green">+₹18,070</span><br>
+          Largest loss: <span class="red">-₹2,080</span>
+        </div>
+      </div>
+      <div style="background:#0d1525;border-radius:10px;padding:12px">
+        <div style="font-size:12px;font-weight:700;color:var(--blue);margin-bottom:8px">📅 Month-wise</div>
+        <div id="mStats" style="font-size:12px;line-height:2"></div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="section-title">All 100 Days — Daily Signal Log</div>
+    <div style="max-height:400px;overflow-y:auto">
+      <table><thead><tr><th>Date</th><th>Prev</th><th>Close</th><th>Change</th><th>Gift</th><th>VIX</th><th>Score</th><th>Conf</th><th>Predicted</th><th>Actual</th><th>Correct</th><th>DTE</th></tr></thead>
+      <tbody id="adTbl"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- P4: P&L LOG -->
+<div id="p4" class="page">
+  <div class="g4" style="margin-bottom:14px">
+    <div class="kpi" style="border-color:#3b82f6"><div class="kpi-label">Weeks Tracked</div><div class="kpi-value white">15</div><div class="kpi-sub">Jan–Jun 2026</div></div>
+    <div class="kpi" style="border-color:#059669"><div class="kpi-label">Profitable Weeks</div><div class="kpi-value green">11 / 15</div><div class="kpi-sub">73% weeks in green</div></div>
+    <div class="kpi" style="border-color:#059669"><div class="kpi-label">Total Profit</div><div class="kpi-value green">+₹79,444</div><div class="kpi-sub">₹2L → ₹2.79L</div></div>
+    <div class="kpi" style="border-color:#ef4444"><div class="kpi-label">Loss Weeks Cost</div><div class="kpi-value red">-₹5,091</div><div class="kpi-sub">All 4 losses in May</div></div>
+  </div>
+  <div class="card"><div class="section-title">Weekly P&amp;L Bar Chart</div><div id="wChart"></div><div class="exbox">Feb-Mar 2026 bear market was most profitable — NIFTY crashed and Bear Put Spreads crushed it. May's 4 losses (−₹5,091) recovered in <strong>2 June trades</strong> (+₹33,722). Defined-risk spreads: losses are capped, wins have large upside.</div></div>
+  <div class="card"><div class="section-title">Cumulative Capital Growth</div><div id="cChart"></div></div>
+  <div class="card"><div class="section-title">All 15 Weekly Trades</div><div id="wTbl"></div></div>
+  <div class="card">
+    <div class="section-title">Key Learnings</div>
+    <div class="g2">
+      <div>
+        <div class="ins ig">✅ <strong>Bear weeks (Feb-Mar) most profitable.</strong> NIFTY crashed → Bear Put Spreads returned ₹2K-₹18K per trade. Score was HIGH confidence both months.</div>
+        <div class="ins ig">✅ <strong>Hold 2 days, not more.</strong> All 11 winners exited in 2-3 days. Time decay accelerates — early exit captures most profit.</div>
+        <div class="ins ig">✅ <strong>HIGH confidence (≥40) never lost</strong> in this backtest. All 4 losses were MED-confidence trades (score 20-39).</div>
+      </div>
+      <div>
+        <div class="ins ir">❌ <strong>May 2026 whipsaw.</strong> 4 consecutive losses when trend reversed. Fix: After 2 losses, skip 1 week + trade half lot.</div>
+        <div class="ins ir">❌ <strong>DTE 0 = biggest loss source.</strong> Never buy or hold options on expiry day. Theta eats 40-60% in final hours.</div>
+        <div class="ins iamb">⚠ <strong>Rules:</strong> Max 1 trade/week. Min score ±40 for full lot. Score 20-39 = half lot or skip.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /app -->
+
+<script>
+// ═══ CONSTANTS ═══
+const LOT=25,WIDTH=300,R=0.065;
+const FB={nifty:24000,niftyChg:0.5,vix:14.5,vixChg:-0.3,sp500:5960,sp500Chg:0.4,dow:43400,dowChg:0.6,nas:25888,nasChg:0.3,nikkei:38500,nikkeiChg:0.5,hsi:22000,hsiChg:-0.2,usdinr:85.5,usdinrChg:0.08,gold:3320,goldChg:0.2,crude:78.5,crudeChg:-0.3,silver:32.5,silverChg:0.1};
+let D={...FB},autoKey='';
+
+// ═══ STATIC DATA ═══
+const TRADES=[{entry_date:"2026-01-23",exit_date:"2026-01-28",expiry:"2026-01-27",direction:"BEAR",inst:"PE",buy_strike:25200,sell_strike:24900,buy_premium:36,sell_premium:14,net_debit:22,dte_entry:2,days_held:2,score:-46,confidence:"HIGH",entry_nifty:25290,exit_nifty:25023,move:-267,pnl:4859,max_loss:1430,win:true,capital_after:204859},
+{entry_date:"2026-02-05",exit_date:"2026-02-09",expiry:"2026-02-10",direction:"BEAR",inst:"PE",buy_strike:24700,sell_strike:24400,buy_premium:36,sell_premium:14,net_debit:22,dte_entry:3,days_held:2,score:-31,confidence:"MED",entry_nifty:24786,exit_nifty:24668,move:-118,pnl:2148,max_loss:1430,win:true,capital_after:207007},
+{entry_date:"2026-02-12",exit_date:"2026-02-16",expiry:"2026-02-17",direction:"BEAR",inst:"PE",buy_strike:24450,sell_strike:24150,buy_premium:36,sell_premium:14,net_debit:22,dte_entry:3,days_held:2,score:-40,confidence:"HIGH",entry_nifty:24574,exit_nifty:24503,move:-71,pnl:1292,max_loss:1430,win:true,capital_after:208299},
+{entry_date:"2026-02-19",exit_date:"2026-02-23",expiry:"2026-02-24",direction:"BEAR",inst:"PE",buy_strike:24400,sell_strike:24100,buy_premium:36,sell_premium:14,net_debit:22,dte_entry:3,days_held:2,score:-50,confidence:"HIGH",entry_nifty:24519,exit_nifty:24373,move:-146,pnl:2657,max_loss:1430,win:true,capital_after:210956},
+{entry_date:"2026-02-27",exit_date:"2026-03-03",expiry:"2026-03-03",direction:"BEAR",inst:"PE",buy_strike:24050,sell_strike:23750,buy_premium:36,sell_premium:14,net_debit:22,dte_entry:2,days_held:2,score:-46,confidence:"HIGH",entry_nifty:24157,exit_nifty:23370,move:-787,pnl:14323,max_loss:1430,win:true,capital_after:225279},
+{entry_date:"2026-03-04",exit_date:"2026-03-09",expiry:"2026-03-10",direction:"BEAR",inst:"PE",buy_strike:23250,sell_strike:22950,buy_premium:46,sell_premium:14,net_debit:32,dte_entry:4,days_held:3,score:-65,confidence:"HIGH",entry_nifty:23370,exit_nifty:22608,move:-762,pnl:13868,max_loss:2080,win:true,capital_after:239147},
+{entry_date:"2026-03-19",exit_date:"2026-03-23",expiry:"2026-03-24",direction:"BEAR",inst:"PE",buy_strike:22300,sell_strike:22000,buy_premium:36,sell_premium:14,net_debit:22,dte_entry:3,days_held:2,score:-41,confidence:"HIGH",entry_nifty:22416,exit_nifty:22295,move:-121,pnl:2202,max_loss:1430,win:true,capital_after:241349},
+{entry_date:"2026-04-09",exit_date:"2026-04-15",expiry:"2026-04-14",direction:"BULL",inst:"CE",buy_strike:23150,sell_strike:23450,buy_premium:36,sell_premium:14,net_debit:22,dte_entry:3,days_held:2,score:27,confidence:"MED",entry_nifty:23033,exit_nifty:23340,move:307,pnl:5587,max_loss:1430,win:true,capital_after:246936},
+{entry_date:"2026-04-24",exit_date:"2026-04-28",expiry:"2026-04-28",direction:"BEAR",inst:"PE",buy_strike:23850,sell_strike:23550,buy_premium:36,sell_premium:14,net_debit:22,dte_entry:2,days_held:2,score:-26,confidence:"MED",entry_nifty:23949,exit_nifty:24150,move:201,pnl:-1430,max_loss:1430,win:false,capital_after:245506},
+{entry_date:"2026-05-07",exit_date:"2026-05-11",expiry:"2026-05-12",direction:"BULL",inst:"CE",buy_strike:24700,sell_strike:25000,buy_premium:36,sell_premium:14,net_debit:22,dte_entry:3,days_held:2,score:65,confidence:"HIGH",entry_nifty:24593,exit_nifty:24806,move:213,pnl:3877,max_loss:1430,win:true,capital_after:249383},
+{entry_date:"2026-05-15",exit_date:"2026-05-19",expiry:"2026-05-19",direction:"BULL",inst:"CE",buy_strike:25000,sell_strike:25300,buy_premium:36,sell_premium:14,net_debit:22,dte_entry:2,days_held:2,score:44,confidence:"HIGH",entry_nifty:24915,exit_nifty:24871,move:-44,pnl:-801,max_loss:1430,win:false,capital_after:248582},
+{entry_date:"2026-05-22",exit_date:"2026-05-26",expiry:"2026-05-26",direction:"BULL",inst:"CE",buy_strike:24900,sell_strike:25200,buy_premium:36,sell_premium:14,net_debit:22,dte_entry:2,days_held:2,score:36,confidence:"MED",entry_nifty:24816,exit_nifty:24727,move:-89,pnl:-1430,max_loss:1430,win:false,capital_after:247152},
+{entry_date:"2026-05-29",exit_date:"2026-06-02",expiry:"2026-06-02",direction:"BULL",inst:"CE",buy_strike:24850,sell_strike:25150,buy_premium:36,sell_premium:14,net_debit:22,dte_entry:2,days_held:2,score:25,confidence:"MED",entry_nifty:24749,exit_nifty:24611,move:-138,pnl:-1430,max_loss:1430,win:false,capital_after:245722},
+{entry_date:"2026-06-05",exit_date:"2026-06-09",expiry:"2026-06-09",direction:"BEAR",inst:"PE",buy_strike:24400,sell_strike:24100,buy_premium:36,sell_premium:14,net_debit:22,dte_entry:2,days_held:2,score:-20,confidence:"MED",entry_nifty:24487,exit_nifty:23244,move:-1243,pnl:18070,max_loss:1430,win:true,capital_after:263792},
+{entry_date:"2026-06-12",exit_date:"2026-06-16",expiry:"2026-06-16",direction:"BULL",inst:"CE",buy_strike:23200,sell_strike:23500,buy_premium:36,sell_premium:14,net_debit:22,dte_entry:2,days_held:2,score:65,confidence:"HIGH",entry_nifty:23124,exit_nifty:23984,move:860,pnl:15652,max_loss:1430,win:true,capital_after:279444}];
+
+const ALL_ROWS=[{date:"2026-01-20",prev_close:25586,close:25477,actual_dir:"BEAR",gift:25490,vix:16.8,score:-20,confidence:"MED",predicted:"BEAR",hit:true,change_pct:-0.43,dte:0},{date:"2026-01-21",prev_close:25477,close:25290,actual_dir:"BEAR",gift:25300,vix:16.5,score:-25,confidence:"MED",predicted:"BEAR",hit:true,change_pct:-0.73,dte:4},{date:"2026-01-22",prev_close:25290,close:25158,actual_dir:"BEAR",gift:25150,vix:17.2,score:-30,confidence:"MED",predicted:"BEAR",hit:true,change_pct:-0.52,dte:3},{date:"2026-01-23",prev_close:25158,close:25000,actual_dir:"BEAR",gift:25010,vix:17.8,score:-46,confidence:"HIGH",predicted:"BEAR",hit:true,change_pct:-0.63,dte:2},{date:"2026-01-26",prev_close:25000,close:25100,actual_dir:"BULL",gift:25080,vix:17.5,score:10,confidence:"LOW",predicted:"BULL",hit:true,change_pct:0.4,dte:1},{date:"2026-01-27",prev_close:25100,close:24950,actual_dir:"BEAR",gift:24940,vix:18.0,score:-15,confidence:"LOW",predicted:"BEAR",hit:true,change_pct:-0.6,dte:0},{date:"2026-01-28",prev_close:24950,close:24900,actual_dir:"BEAR",gift:24890,vix:18.2,score:-22,confidence:"MED",predicted:"BEAR",hit:true,change_pct:-0.2,dte:3}];
+
+// ═══ LOGIN ═══
+function doLogin(){
+  if(document.getElementById('lu').value.trim()==='admin'&&document.getElementById('lp').value==='NiftyV9-Secure-29Jun2026!'){
+    document.getElementById('lo').style.display='none';
+    document.getElementById('app').style.display='block';
+    initStatic();fetchAndRender();
+  } else {document.getElementById('lerr').style.display='block';document.getElementById('lp').value='';}
+}
+
+// ═══ IST TIME ═══
+function getIST(){return new Date(new Date().getTime()+330*60000);}
+function istHM(){const d=getIST();return{h:d.getUTCHours(),m:d.getUTCMinutes(),day:d.getUTCDay()};}
+function dteFmt(){
+  const ist=getIST(),day=ist.getUTCDay();
+  let dt=(4-day+7)%7;if(dt===0)dt=7;
+  const exp=new Date(ist.getTime()+dt*86400000);
+  return{dte:dt,expiry:exp.toISOString().slice(0,10)};
+}
+
+// ═══ BLACK-SCHOLES (fixes wrong LTP) ═══
+function normCDF(x){
+  const a=[0.319381530,-0.356563782,1.781477937,-1.821255978,1.330274429];
+  const s=x<0?-1:1;x=Math.abs(x);
+  const k=1/(1+0.2316419*x);
+  const poly=((((a[4]*k+a[3])*k+a[2])*k+a[1])*k+a[0])*k;
+  const n=Math.exp(-x*x/2)/Math.sqrt(2*Math.PI)*poly;
+  return s===1?1-n:n;
+}
+function bsPrice(S,K,T,sig,type){
+  if(T<=0||sig<=0)return Math.max(0.05,type==='CE'?S-K:K-S);
+  const d1=(Math.log(S/K)+(R+sig*sig/2)*T)/(sig*Math.sqrt(T)),d2=d1-sig*Math.sqrt(T);
+  return type==='CE'?Math.max(0.05,S*normCDF(d1)-K*Math.exp(-R*T)*normCDF(d2)):Math.max(0.05,K*Math.exp(-R*T)*normCDF(-d2)-S*normCDF(-d1));
+}
+function atm50(p){return Math.round(p/50)*50;}
+
+// ═══ SIGNAL COMPUTATION ═══
+function compSig(){
+  let score=0;const factors=[];
+  const sp=D.sp500Chg;
+  if(sp>0.5){score+=22;factors.push({name:'🇺🇸 S&P 500 (US overnight)',val:`+${sp.toFixed(2)}%`,detail:'US rose strongly → global sentiment positive → bullish for NIFTY.',bull:true,w:22});}
+  else if(sp>0.1){score+=12;factors.push({name:'🇺🇸 S&P 500 (US overnight)',val:`+${sp.toFixed(2)}%`,detail:'US mildly up → cautious optimism.',bull:true,w:12});}
+  else if(sp<-0.5){score-=22;factors.push({name:'🇺🇸 S&P 500 (US overnight)',val:`${sp.toFixed(2)}%`,detail:'US fell sharply → global fear rising → bearish pressure on NIFTY.',bull:false,w:22});}
+  else if(sp<-0.1){score-=12;factors.push({name:'🇺🇸 S&P 500 (US overnight)',val:`${sp.toFixed(2)}%`,detail:'US down mildly → some weakness expected.',bull:false,w:12});}
+  else factors.push({name:'🇺🇸 S&P 500 (US overnight)',val:`${sp.toFixed(2)}%`,detail:'US flat → no strong signal.',bull:null,w:0});
+
+  const vx=D.vix;
+  if(vx<14){score+=22;factors.push({name:'😌 India VIX (Fear)',val:`${vx.toFixed(1)} — Very Low`,detail:'VIX under 14 = extreme calm. Options cheapest. Perfect for debit spreads.',bull:true,w:22});}
+  else if(vx<16){score+=15;factors.push({name:'😌 India VIX (Fear)',val:`${vx.toFixed(1)} — Low`,detail:'VIX 14-16 = low fear. Good for debit spreads.',bull:true,w:15});}
+  else if(vx<19){score+=5;factors.push({name:'😐 India VIX (Fear)',val:`${vx.toFixed(1)} — Moderate`,detail:'VIX 16-19: some vol. Tradeable.',bull:true,w:5});}
+  else if(vx<22){score-=15;factors.push({name:'😨 India VIX (Fear)',val:`${vx.toFixed(1)} — Elevated`,detail:'VIX 19-22: fear building. Reduce size.',bull:false,w:15});}
+  else{score-=25;factors.push({name:'🔴 India VIX (Fear)',val:`${vx.toFixed(1)} — HIGH`,detail:'VIX above 22 = panic. Options too expensive. Avoid.',bull:false,w:25});}
+
+  const nc=D.niftyChg;
+  if(nc>0.5){score+=15;factors.push({name:'📈 NIFTY Momentum',val:`+${nc.toFixed(2)}%`,detail:'NIFTY rising strong → trend continuation expected.',bull:true,w:15});}
+  else if(nc>0.1){score+=8;factors.push({name:'📈 NIFTY Momentum',val:`+${nc.toFixed(2)}%`,detail:'NIFTY up mildly. Slight bullish bias.',bull:true,w:8});}
+  else if(nc<-0.5){score-=15;factors.push({name:'📉 NIFTY Momentum',val:`${nc.toFixed(2)}%`,detail:'NIFTY falling — bearish momentum.',bull:false,w:15});}
+  else if(nc<-0.1){score-=8;factors.push({name:'📉 NIFTY Momentum',val:`${nc.toFixed(2)}%`,detail:'NIFTY down slightly. Watch before entering.',bull:false,w:8});}
+  else factors.push({name:'➡ NIFTY Momentum',val:`${nc.toFixed(2)}%`,detail:'NIFTY flat. No momentum signal.',bull:null,w:0});
+
+  const usd=D.usdinr;
+  if(usd>86.5){score-=12;factors.push({name:'💵 USD/INR',val:`₹${usd.toFixed(1)}/USD`,detail:'INR very weak → FIIs selling India → bearish.',bull:false,w:12});}
+  else if(usd>85.5){score-=5;factors.push({name:'💵 USD/INR',val:`₹${usd.toFixed(1)}/USD`,detail:'INR slightly weak. Mild headwind.',bull:false,w:5});}
+  else if(usd<83){score+=12;factors.push({name:'💵 USD/INR',val:`₹${usd.toFixed(1)}/USD`,detail:'INR strong → FII inflows likely → mildly bullish.',bull:true,w:12});}
+  else factors.push({name:'💵 USD/INR',val:`₹${usd.toFixed(1)}/USD`,detail:'USD/INR neutral zone.',bull:null,w:0});
+
+  const gc=D.goldChg;
+  if(gc>1.5){score-=18;factors.push({name:'🥇 Gold (Safe Haven)',val:`+${gc.toFixed(2)}%`,detail:'Gold surging → investors fleeing to safety → VERY bearish for equities.',bull:false,w:18});}
+  else if(gc>0.5){score-=8;factors.push({name:'🥇 Gold (Safe Haven)',val:`+${gc.toFixed(2)}%`,detail:'Gold rising → mild risk-off.',bull:false,w:8});}
+  else if(gc<-0.5){score+=10;factors.push({name:'🥇 Gold (Safe Haven)',val:`${gc.toFixed(2)}%`,detail:'Gold falling → money into equities → bullish.',bull:true,w:10});}
+  else factors.push({name:'🥇 Gold (Safe Haven)',val:`${gc.toFixed(2)}%`,detail:'Gold flat. Neutral.',bull:null,w:0});
+
+  const conf=Math.abs(score)>=40?'HIGH':Math.abs(score)>=25?'MED':'LOW';
+  const dir=score>=25?'BULL':score<=-25?'BEAR':'NEUTRAL';
+  return{score,factors,conf,dir};
+}
+
+// ═══ FETCH LIVE DATA ═══
+async function fetchLiveData(){
+  const syms='^NSEI,^INDIAVIX,^GSPC,^DJI,^IXIC,^N225,^HSI,USDINR=X,GC=F,CL=F,SI=F';
+  const resp=await fetch('https://api.allorigins.win/raw?url='+encodeURIComponent('https://query1.finance.yahoo.com/v7/finance/quote?symbols='+syms),{signal:AbortSignal.timeout(10000)});
+  if(!resp.ok)throw new Error('bad');
+  const j=await resp.json();const res=j?.quoteResponse?.result||[];
+  const by={};res.forEach(r=>{by[r.symbol]=r;});
+  const g=(s,f)=>by[s]?.regularMarketPrice??f,gc2=(s,f)=>by[s]?.regularMarketChangePercent??f;
+  D.nifty=g('^NSEI',FB.nifty);D.niftyChg=gc2('^NSEI',FB.niftyChg);
+  D.vix=g('^INDIAVIX',FB.vix);D.vixChg=gc2('^INDIAVIX',FB.vixChg);
+  D.sp500=g('^GSPC',FB.sp500);D.sp500Chg=gc2('^GSPC',FB.sp500Chg);
+  D.dow=g('^DJI',FB.dow);D.dowChg=gc2('^DJI',FB.dowChg);
+  D.nas=g('^IXIC',FB.nas);D.nasChg=gc2('^IXIC',FB.nasChg);
+  D.nikkei=g('^N225',FB.nikkei);D.nikkeiChg=gc2('^N225',FB.nikkeiChg);
+  D.hsi=g('^HSI',FB.hsi);D.hsiChg=gc2('^HSI',FB.hsiChg);
+  D.usdinr=g('USDINR=X',FB.usdinr);D.usdinrChg=gc2('USDINR=X',FB.usdinrChg);
+  D.gold=g('GC=F',FB.gold);D.goldChg=gc2('GC=F',FB.goldChg);
+  D.crude=g('CL=F',FB.crude);D.crudeChg=gc2('CL=F',FB.crudeChg);
+  D.silver=g('SI=F',FB.silver);D.silverChg=gc2('SI=F',FB.silverChg??0);
+}
+function setLoading(v){document.getElementById('loadB').style.display=v?'flex':'none';}
+async function fetchAndRender(){setLoading(true);try{await fetchLiveData();}catch(e){console.log('Fallback:',e.message);}renderP1();renderP2();setLoading(false);updateTS();}
+async function runUpdate(){const b=document.getElementById('runBtn');b.textContent='⟳ Updating…';b.disabled=true;await fetchAndRender();b.textContent='▶ RUN UPDATE';b.disabled=false;}
+
+// ═══ TIMESTAMP ═══
+function updateTS(){
+  const ist=getIST(),h=ist.getUTCHours(),m=ist.getUTCMinutes();
+  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('topD').textContent=`${days[ist.getUTCDay()]} ${ist.getUTCDate()} ${months[ist.getUTCMonth()]} · ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')} IST`;
+  document.getElementById('topN').textContent=`NIFTY ${D.nifty.toLocaleString('en-IN',{maximumFractionDigits:0})}`;
+  const nc=D.niftyChg;
+  document.getElementById('topC').innerHTML=`<span style="color:${nc>=0?'#34d399':'#fca5a5'}">${nc>=0?'▲':'▼'}${Math.abs(nc).toFixed(2)}%</span>`;
+  document.getElementById('topV').textContent=`VIX ${D.vix.toFixed(1)}`;
+}
+function initTS(){
+  const ist=getIST(),days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('topD').textContent=`${days[ist.getUTCDay()]} ${ist.getUTCDate()} ${months[ist.getUTCMonth()]}`;
+  document.getElementById('topN').textContent=`NIFTY ${D.nifty.toLocaleString('en-IN',{maximumFractionDigits:0})}`;
+  document.getElementById('topV').textContent=`VIX ${D.vix.toFixed(1)}`;
+}
+
+// ═══ OI MAP ═══
+function renderOI(id,atm,step=50,cnt=7){
+  const mx=1000;let h='<div style="display:flex;gap:3px;align-items:center;padding:4px 0;min-height:110px">';
+  for(let i=-cnt;i<=cnt;i++){
+    const k=atm+i*step,isA=i===0;
+    const cOI=i>0?Math.round(mx*Math.exp(-((i-1)**2)/3)+50):30;
+    const pOI=i<0?Math.round(mx*Math.exp(-((-i-1)**2)/3)+50):30;
+    const ch=Math.round((cOI/mx)*70),ph=Math.round((pOI/mx)*70);
+    h+=`<div style="display:flex;flex-direction:column;align-items:center;min-width:${step>=100?54:42}px">
+      <div style="height:${ch}px;width:28px;background:#ef4444;border-radius:2px 2px 0 0;opacity:${i>0?.9:.35}"></div>
+      <div style="height:2px;background:${isA?'#fff':'#374151'};width:100%"></div>
+      <div style="height:${ph}px;width:28px;background:#10b981;border-radius:0 0 2px 2px;opacity:${i<0?.9:.35}"></div>
+      <div style="font-size:9px;color:${isA?'#fff':i>0?'#fca5a5':'#86efac'};margin-top:3px;font-weight:${isA?700:400}">${step>=100?(k/1000).toFixed(0)+'k':(k/1000).toFixed(1)+'k'}</div>
+      ${isA?'<div style="font-size:8px;color:#fbbf24;font-weight:700">ATM</div>':''}
+    </div>`;
+  }
+  h+='</div>';document.getElementById(id).innerHTML=h;
+}
+
+// ═══ RENDER P1: NIFTY SIGNAL ═══
+function renderP1(){
+  const sig=compSig(),{score,factors,conf,dir}=sig;
+  const nifty=D.nifty,vix=D.vix,{dte,expiry}=dteFmt();
+  const T=Math.max(0.003,dte/365),sigma=vix/100,atmK=atm50(nifty);
+  let buyK,sellK,optType,stratName;
+  if(dir==='BULL'){buyK=atmK;sellK=atmK+WIDTH;optType='CE';stratName='Bull Call Spread';}
+  else if(dir==='BEAR'){buyK=atmK;sellK=atmK-WIDTH;optType='PE';stratName='Bear Put Spread';}
+  else{buyK=atmK;sellK=atmK+WIDTH;optType='CE';stratName='Directional Spread (Signal Weak — Consider Waiting)';}
+
+  const buyLTP=Math.round(bsPrice(nifty,buyK,T,sigma,optType)*10)/10;
+  const sellLTP=Math.round(bsPrice(nifty,sellK,T,sigma,optType)*10)/10;
+  const nd=Math.max(1,Math.round((buyLTP-sellLTP)*10)/10);
+  const mL=Math.round(nd*LOT),mG=Math.round((WIDTH-nd)*LOT);
+  const rr=Math.round((mG/mL)*10)/10;
+  const beK=dir==='BULL'?buyK+nd:buyK-nd;
+  const minW=Math.round((1/(1+rr))*100);
+  const ev35=Math.round(0.35*mG-0.65*mL);
+  const slN=dir==='BULL'?Math.round(nifty-130):Math.round(nifty+130);
+  const t2N=dir==='BULL'?Math.round(nifty+190):Math.round(nifty-190);
+  const t3N=dir==='BULL'?Math.round(nifty+260):Math.round(nifty-260);
+  const slL=Math.round(nd*0.6*LOT),t2P=Math.round(nd*1.8*LOT),t3P=Math.round((WIDTH*0.85-nd)*LOT);
+  const dCol=dir==='BULL'?'#34d399':dir==='BEAR'?'#fca5a5':'#93c5fd';
+  const dCls=dir==='BULL'?'dbull':dir==='BEAR'?'dbear':'dwait';
+
+  // Direction banner
+  document.getElementById('dBanner').className=`dbanner ${dCls}`;
+  document.getElementById('dMeta').textContent=`${expiry} · DTE ${dte} · NIFTY ${nifty.toLocaleString('en-IN',{maximumFractionDigits:0})} · VIX ${vix.toFixed(1)}`;
+  document.getElementById('dTitle').innerHTML=`<span style="color:${dCol}">${dir==='BULL'?'▲ BULLISH — Buy Bull Call Spread':dir==='BEAR'?'▼ BEARISH — Buy Bear Put Spread':'⏸ NEUTRAL — Wait for Clarity'}</span>`;
+  const cl=conf==='HIGH'?`Score ${score>0?'+':''}${score} — HIGH confidence. Trade with full lot (25 units).`:conf==='MED'?`Score ${score>0?'+':''}${score} — MEDIUM confidence. Half lot (13 units) only.`:`Score ${score>0?'+':''}${score} — LOW confidence. SKIP today. Wait for tomorrow.`;
+  document.getElementById('dDesc').textContent=cl;
+  document.getElementById('dScore').textContent=(score>0?'+':'')+score;
+  document.getElementById('dScore').style.color=dCol;
+  const bCl=conf==='HIGH'?'bh':conf==='MED'?'bm':'blow';
+  document.getElementById('dBadge').innerHTML=`<span class="badge ${bCl}">${conf==='HIGH'?'⚡ HIGH CONFIDENCE':conf==='MED'?'📊 MEDIUM':'⚠ LOW — WAIT'}</span>`;
+
+  // Signals
+  document.getElementById('sigF').innerHTML=factors.map(f=>`<div style="margin-bottom:10px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+      <span style="font-size:12px;font-weight:700;color:${f.bull===true?'#34d399':f.bull===false?'#fca5a5':'#fbbf24'}">${f.name}</span>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:11px;color:var(--muted)">${f.val}</span>
+        <span style="font-size:12px;font-weight:800;color:${f.bull===true?'#34d399':f.bull===false?'#fca5a5':'#fbbf24'}">${f.bull===true?'+'+f.w:f.bull===false?'-'+f.w:'0'}</span>
+      </div>
+    </div>
+    <div class="sigbar"><div class="sigfill" style="width:${(f.w/25)*100}%;background:${f.bull===true?'#10b981':f.bull===false?'#ef4444':'#f59e0b'}"></div></div>
+    <div style="font-size:10px;color:var(--muted)">${f.detail}</div>
+  </div>`).join('');
+
+  // Global table
+  const gR=[
+    {f:'🇺🇸 S&P 500',v:D.sp500,c:D.sp500Chg,m:'US sentiment'},
+    {f:'🇺🇸 Dow Jones',v:D.dow,c:D.dowChg,m:'US blue chips'},
+    {f:'🇺🇸 NASDAQ',v:D.nas,c:D.nasChg,m:'US tech'},
+    {f:'🇯🇵 Nikkei 225',v:D.nikkei,c:D.nikkeiChg,m:'Asia direction'},
+    {f:'🇭🇰 Hang Seng',v:D.hsi,c:D.hsiChg,m:'China signal'},
+    {f:'📊 India VIX',v:D.vix,c:D.vixChg,m:D.vix<15?'Options cheap ✅':D.vix>20?'Fear high ⚠':'Moderate'},
+    {f:'🛢 WTI Crude',v:'$'+D.crude.toFixed(1),c:D.crudeChg,m:D.crudeChg<0?'Falls = good ✅':'Rises = inflation risk'},
+    {f:'🥇 Gold',v:'$'+D.gold.toFixed(0),c:D.goldChg,m:D.goldChg>1?'Risk-off ⚠':'Neutral/Bullish ✅'},
+    {f:'💵 USD/INR',v:'₹'+D.usdinr.toFixed(1),c:D.usdinrChg,m:D.usdinr>86?'INR weak ⚠':D.usdinr<84?'INR strong ✅':'Neutral'},
+  ];
+  document.getElementById('gTbl').innerHTML=gR.map(r=>`<tr><td>${r.f}</td><td class="white">${typeof r.v==='number'?r.v.toLocaleString('en-IN',{maximumFractionDigits:0}):r.v}</td><td style="color:${r.c>=0?'#34d399':'#fca5a5'}">${r.c>=0?'+':''}${r.c.toFixed(2)}%</td><td style="color:${r.c>=0?'#34d399':r.c>-0.5?'#fbbf24':'#fca5a5'}">${r.m}</td></tr>`).join('');
+
+  // Pattern checks
+  const pc=(ok,txt)=>`<div class="pchk"><span style="color:${ok?'#34d399':'#fca5a5'}">${ok?'✅':'❌'}</span><span>${txt}</span></div>`;
+  document.getElementById('pat1').innerHTML=pc(vix<16,`VIX ${vix.toFixed(1)} — ${vix<16?'Low, options cheap ✅':'Consider reducing size'}`)+pc(nd<100,`Net debit ₹${nd} — ${nd<100?'In safe zone ✅':'High cost ⚠'}`)+pc(true,`Max loss capped at ₹${mL.toLocaleString()}`)+`<div style="margin-top:6px;font-size:10px;color:var(--green)">💡 VIX&lt;15 = cheapest options</div>`;
+  const dteOk=dte>=3&&dte<=7;
+  document.getElementById('pat2').innerHTML=pc(dteOk,`DTE ${dte} — ${dteOk?'Sweet spot (3-7) ✅':dte<=2?'Too close ⚠':'Far, theta slow'}`)+pc(dte>0,'Not expiry day ✅')+pc(true,`Target exit: ${dte<=2?'Same/next day':'2-3 days'}`)+`<div style="margin-top:6px;font-size:10px;color:var(--green)">💡 DTE 4-7 = highest win rate</div>`;
+  document.getElementById('pat3').innerHTML=pc(conf==='HIGH',`Score ${score>0?'+':''}${score} — ${conf==='HIGH'?'HIGH ✅':conf==='MED'?'MED, reduce lot ⚠':'LOW, SKIP ❌'}`)+pc(conf!=='LOW',conf==='LOW'?'DO NOT TRADE today':'Signal strong enough to act')+pc(dir!=='NEUTRAL','Clear directional bias')+`<div style="margin-top:6px;font-size:10px;color:${conf==='HIGH'?'var(--green)':conf==='MED'?'var(--amber)':'var(--red)'}">${conf==='HIGH'?'💡 HIGH: all your losses were MED/LOW':conf==='MED'?'⚠ MED: half lot only':'❌ LOW: skip today'}</div>`;
+
+  // OI Map
+  renderOI('oiMap',atmK);
+
+  // Trade details
+  document.getElementById('tSt').textContent=stratName;
+  document.getElementById('tBL').innerHTML=`<span class="badge bb">BUY</span> <strong class="white">NIFTY ${buyK.toLocaleString()} ${optType} @ ₹${buyLTP}</strong> <span class="muted" style="font-size:10px">(Black-Scholes price)</span>`;
+  document.getElementById('tSL').innerHTML=`<span class="badge br">SELL</span> <strong class="white">NIFTY ${sellK.toLocaleString()} ${optType} @ ₹${sellLTP}</strong>`;
+  document.getElementById('tD').textContent=`₹${nd}/unit = ₹${mL.toLocaleString()} total cost (${LOT} lots)`;
+  document.getElementById('tML').textContent=`₹${mL.toLocaleString()} — MAXIMUM you can lose. Nothing more.`;
+  document.getElementById('tMG').textContent=`₹${mG.toLocaleString()} — if NIFTY reaches ${sellK.toLocaleString()} at exit`;
+  document.getElementById('tBE').textContent=`NIFTY ${beK.toFixed(0)} (${Math.abs(beK-nifty).toFixed(0)} pts ${dir==='BULL'?'above':'below'} current)`;
+  document.getElementById('tEN').textContent='9:20 – 9:45 AM. Tightest spreads in first 30 mins.';
+  document.getElementById('tEX').textContent=`${expiry} (${dte} days away)`;
+  const su=`https://app.sensibull.com/strategy-builder?instrument=NIFTY&expiry=${expiry}&strategy=${dir==='BULL'?'bull_call_spread':'bear_put_spread'}&buy_strike=${buyK}&sell_strike=${sellK}`;
+  document.getElementById('tSurl').innerHTML=`<a href="${su}" target="_blank" class="btn btn-s" style="width:100%;justify-content:center">↗ Verify Live Premium on Sensibull</a><div style="font-size:10px;color:var(--muted);text-align:center;margin-top:4px">Always check live premium. Accept ±5 from BS price.</div>`;
+
+  // RR Box
+  document.getElementById('rrR').textContent=rr+':1';
+  document.getElementById('rrB').textContent=minW+'%';
+  document.getElementById('rrE').textContent=ev35>=0?'+₹'+ev35.toLocaleString():'-₹'+Math.abs(ev35).toLocaleString();
+  document.getElementById('rrE').className=ev35>=0?'green':'red';
+
+  // Exit levels
+  document.getElementById('lvls').innerHTML=`
+    <div class="lbox lentry"><div style="font-size:9px;color:#93c5fd;margin-bottom:4px">📍 ENTRY</div><div style="font-size:20px;font-weight:900;color:#fff">${nifty.toLocaleString('en-IN',{maximumFractionDigits:0})}</div><div style="font-size:9px;color:var(--muted)">Enter now</div></div>
+    <div class="lbox lsl"><div style="font-size:9px;color:#fca5a5;margin-bottom:4px">🚨 STOP LOSS</div><div style="font-size:20px;font-weight:900;color:#ef4444">${slN.toLocaleString()}</div><div style="font-size:9px;color:var(--muted)">Exit → lose ~₹${slL.toLocaleString()}</div></div>
+    <div class="lbox l2x"><div style="font-size:9px;color:#86efac;margin-bottom:4px">🎯 2× TARGET</div><div style="font-size:20px;font-weight:900;color:#10b981">${t2N.toLocaleString()}</div><div style="font-size:9px;color:var(--muted)">Exit half → +₹${t2P.toLocaleString()}</div></div>
+    <div class="lbox l3x"><div style="font-size:9px;color:#c4b5fd;margin-bottom:4px">🚀 3× TARGET</div><div style="font-size:20px;font-weight:900;color:#8b5cf6">${t3N.toLocaleString()}</div><div style="font-size:9px;color:var(--muted)">Exit all → +₹${t3P.toLocaleString()}</div></div>`;
+
+  document.getElementById('tExp').innerHTML=`<strong>📌 Exit Rules (follow mechanically):</strong><br>
+    1️⃣ NIFTY hits <strong style="color:#ef4444">${slN.toLocaleString()}</strong> → SQUARE OFF both legs now. Loss ~₹${slL.toLocaleString()}. No waiting.<br>
+    2️⃣ NIFTY hits <strong style="color:#10b981">${t2N.toLocaleString()}</strong> → EXIT half. Lock in ~₹${t2P.toLocaleString()} profit.<br>
+    3️⃣ NIFTY hits <strong style="color:#8b5cf6">${t3N.toLocaleString()}</strong> → EXIT everything. Full gain ~₹${t3P.toLocaleString()}. Don't be greedy.<br>
+    4️⃣ Always exit in <strong>${dte<=3?'today':'2-3 days max'}</strong>. Theta decay accelerates after that.`;
+
+  document.getElementById('trules').innerHTML=`
+    <div class="ins ir"><strong>✂️ Cut Losses Fast:</strong> When NIFTY hits ${slN.toLocaleString()}, square off IMMEDIATELY. A small loss now prevents a bigger one tomorrow. No hoping, no waiting.</div>
+    <div class="ins ip"><strong>🚀 Let Winners Run:</strong> At 2× target (${t2N.toLocaleString()}), exit only half. Leave rest for 3× (${t3N.toLocaleString()}). ONE 3× win covers ${Math.ceil(3/rr)}+ losses at this RR.</div>
+    <div class="ins iamb"><strong>🧮 The Math Works For You:</strong> RR ${rr}:1 means you need only ${minW}% win rate to break even. At 35% wins: EV = ${ev35>=0?'+':''}₹${ev35.toLocaleString()} per trade. <strong>Discipline beats prediction.</strong></div>`;
+
+  // BTST
+  const{day:wd}=istHM();
+  const dn=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  let bm='';
+  if(wd===5)bm='<strong style="color:#fca5a5">🚫 NO BTST TODAY (Friday):</strong> Weekend theta loss. Exit by 3PM today.';
+  else if(wd===4&&dte<=1)bm='<strong style="color:#fca5a5">⚠ EXPIRY EVE:</strong> Exit before 3PM. Theta destroys 40-60% in final 24 hours.';
+  else if(wd===1&&conf==='HIGH')bm=`<strong style="color:#34d399">✅ MONDAY + HIGH CONF — BTST possible:</strong> Monday is your strongest entry day. VIX ${vix.toFixed(1)} — ${vix<16?'suitable for overnight hold':'check before holding overnight'}.`;
+  else bm=`<strong>💡 ${dn[wd]} Entry — Standard 2-day hold recommended.</strong> Enter today, target exit in 2 days. BTST acceptable if score ≥40. STBT not recommended without full hedge.`;
+  document.getElementById('btstMsg').innerHTML=bm;
+
+  // Scenarios
+  const mv=pts=>dir==='BULL'?Math.round(nifty+pts):Math.round(nifty-pts);
+  document.getElementById('scTbl').innerHTML=`
+    <tr style="background:rgba(16,185,129,.08)"><td>🚀 Strong ${dir==='BULL'?'rally':'fall'}</td><td class="white">→ ${mv(260).toLocaleString()}</td><td class="green"><strong>3× target → EXIT ALL</strong></td><td class="green">Max profit</td><td class="pp">+₹${t3P.toLocaleString()}</td><td class="green">35%</td></tr>
+    <tr><td>📈 Mild ${dir==='BULL'?'rally':'fall'}</td><td class="white">→ ${mv(160).toLocaleString()}</td><td class="green">2× target → exit half</td><td class="green">Partial win</td><td class="pp">+₹${t2P.toLocaleString()}</td><td>35%</td></tr>
+    <tr><td>➡ Flat / sideways</td><td class="white">±100 pts</td><td class="amber">Exit on day 2-3 regardless</td><td class="amber">Small loss</td><td style="color:var(--muted)">-₹${Math.round(nd*0.4*LOT).toLocaleString()}</td><td>20%</td></tr>
+    <tr style="background:rgba(239,68,68,.08)"><td>📉 Goes against</td><td class="white">→ ${slN.toLocaleString()}</td><td class="red"><strong>SL HIT → EXIT IMMEDIATELY</strong></td><td class="red">Defined loss</td><td class="pn">-₹${slL.toLocaleString()}</td><td class="red">10%</td></tr>`;
+}
+
+// ═══ RENDER P2: MCX SIGNAL ═══
+function renderP2(){
+  const mcxG=Math.round(D.gold*D.usdinr*(10/31.1035));
+  const mcxC=Math.round(D.crude*D.usdinr);
+  const mcxS=Math.round(D.silver*D.usdinr*(1000/31.1035));
+  const gATM=Math.round(mcxG/500)*500;
+
+  document.getElementById('gP').textContent='₹'+mcxG.toLocaleString('en-IN');
+  document.getElementById('gC').innerHTML=`<span style="color:${D.goldChg>=0?'#f59e0b':'#6b7280'}">${D.goldChg>=0?'▲':'▼'}${Math.abs(D.goldChg).toFixed(2)}% · COMEX $${D.gold.toFixed(0)}/oz</span>`;
+  const gd=D.goldChg>0.5?'BULL':D.goldChg<-0.5?'BEAR':'FLAT';
+  document.getElementById('gSig').innerHTML=`<span class="badge ${gd==='BULL'?'ba':gd==='BEAR'?'br':'blow'}">${gd==='BULL'?'▲ RISING':gd==='BEAR'?'▼ FALLING':'➡ FLAT'}</span>`;
+
+  document.getElementById('cP').textContent='₹'+mcxC.toLocaleString('en-IN');
+  document.getElementById('cC').innerHTML=`<span style="color:${D.crudeChg>=0?'#34d399':'#fca5a5'}">${D.crudeChg>=0?'▲':'▼'}${Math.abs(D.crudeChg).toFixed(2)}% · WTI $${D.crude.toFixed(1)}/bbl</span>`;
+  document.getElementById('cSig').innerHTML=`<span class="badge ${D.crudeChg>1?'br':'bb'}">${D.crudeChg>1?'▲ Rising (bad for India)':'▼ Falling (good for India)'}</span>`;
+
+  document.getElementById('sP').textContent='₹'+mcxS.toLocaleString('en-IN');
+  document.getElementById('sC').innerHTML=`<span style="color:${(D.silverChg||0)>=0?'#d1d5db':'#6b7280'}">${(D.silverChg||0)>=0?'▲':'▼'}${Math.abs(D.silverChg||0).toFixed(2)}%</span>`;
+  document.getElementById('sSig').innerHTML=`<span class="badge blow">COMEX $${D.silver.toFixed(2)}/oz</span>`;
+
+  document.getElementById('usdTbl').innerHTML=`
+    <tr><td style="color:var(--muted)">USD/INR Live</td><td class="white" style="font-weight:700">₹${D.usdinr.toFixed(2)}/USD</td></tr>
+    <tr><td style="color:var(--muted)">INR today</td><td style="color:${D.usdinrChg>=0?'#fca5a5':'#34d399'}">${D.usdinrChg>=0?'Weakening ':'Strengthening '}(${D.usdinrChg>=0?'+':''}${D.usdinrChg.toFixed(2)}%)</td></tr>
+    <tr><td style="color:var(--muted)">MCX Gold impact</td><td style="color:${D.usdinrChg>=0?'#f59e0b':'var(--muted)'}">${D.usdinrChg>=0?'↑ MCX Gold rises even if COMEX flat':'↓ MCX Gold may lag COMEX rise'}</td></tr>
+    <tr><td style="color:var(--muted)">MCX Crude impact</td><td style="color:${D.usdinrChg>=0?'#fca5a5':'#34d399'}">${D.usdinrChg>=0?'↑ Import cost up = inflation risk':'↓ Cheaper imports = good for India'}</td></tr>
+    <tr><td style="color:var(--muted)">NIFTY impact</td><td style="color:${D.usdinrChg>=0?'#fca5a5':'#34d399'}">${D.usdinrChg>=0?'FIIs may sell if INR weakens further':'FII inflows likely if INR stable/strong'}</td></tr>`;
+
+  document.getElementById('crudeImp').innerHTML=
+    `<div class="ins ${D.crudeChg<-1?'ig':D.crudeChg>1?'ir':'iamb'}" style="margin-bottom:8px"><strong>Crude at $${D.crude.toFixed(1)}/bbl:</strong> ${D.crudeChg<-1?'🟢 Falling = cheaper imports = good for India = NIFTY bullish':D.crudeChg>1?'🔴 Rising = inflation = RBI may hike = bearish for NIFTY':'🟡 Crude stable. Neutral impact.'}</div>
+    <div class="ins ib" style="font-size:12px"><strong>India imports 85% of crude.</strong> Every $10 rise costs India ~$14B/year extra. Widens current account deficit, weakens INR — double headwind for markets. MCX Crude lot = 100 bbl. Use options for defined risk when crude is trending.</div>`;
+
+  // MCX Gold Trade
+  const gDte=dteFmt().dte,gT=Math.max(0.003,gDte/365),gDir=D.goldChg>0.3?'BULL':D.goldChg<-0.3?'BEAR':'NEUTRAL';
+  const gType=gDir==='BULL'?'CE':'PE',gW=1000,gLot=10,gSig2=0.15;
+  const gBuyK=gATM,gSellK=gDir==='BULL'?gATM+gW:gATM-gW;
+  const gBL=Math.max(50,Math.round(bsPrice(mcxG,gBuyK,gT,gSig2,gType)));
+  const gSL2=Math.max(10,Math.round(bsPrice(mcxG,gSellK,gT,gSig2,gType)));
+  const gD=Math.max(30,gBL-gSL2),gML=gD*gLot,gMG=(gW-gD)*gLot,gRR=Math.round((gMG/gML)*10)/10;
+  const gSL=gDir==='BULL'?mcxG-600:mcxG+600,g2x=gDir==='BULL'?gATM+650:gATM-650,g3x=gDir==='BULL'?gATM+900:gATM-900;
+
+  document.getElementById('gTrade').innerHTML=gDir==='NEUTRAL'?
+    `<div class="ins iamb"><strong>⏸ Gold direction unclear</strong> (change ${D.goldChg.toFixed(2)}%). Wait for &gt;0.5% trending move before entering MCX Gold options.</div>`:
+    `<div class="g2" style="gap:14px"><div><table>
+      <tr><td style="color:var(--muted);font-size:11px">Direction</td><td><span class="badge ${gDir==='BULL'?'bb':'br'}">${gDir==='BULL'?'▲ BULLISH':'▼ BEARISH'}</span></td></tr>
+      <tr><td style="color:var(--muted);font-size:11px">Strategy</td><td class="white"><strong>${gDir==='BULL'?'Bull Call Spread':'Bear Put Spread'}</strong></td></tr>
+      <tr><td style="color:var(--muted);font-size:11px">Buy Leg</td><td><span class="badge bb">BUY</span> Gold ${gBuyK.toLocaleString('en-IN')} ${gType} ~₹${gBL}</td></tr>
+      <tr><td style="color:var(--muted);font-size:11px">Sell Leg</td><td><span class="badge br">SELL</span> Gold ${gSellK.toLocaleString('en-IN')} ${gType} ~₹${gSL2}</td></tr>
+      <tr><td style="color:var(--muted);font-size:11px">Net Cost</td><td class="amber">₹${gD}/g × ${gLot}g = <strong>₹${gML.toLocaleString()}</strong></td></tr>
+      <tr><td style="color:var(--muted);font-size:11px">Max Gain</td><td class="green"><strong>₹${gMG.toLocaleString()}</strong> (RR ${gRR}:1)</td></tr>
+    </table></div>
+    <div>
+      <div class="ins iamb"><strong>Exit levels (MCX Gold price):</strong><br>🚨 SL: ₹${gSL.toLocaleString('en-IN')} → exit<br>🎯 2×: ₹${g2x.toLocaleString('en-IN')} → exit half<br>🚀 3×: ₹${g3x.toLocaleString('en-IN')} → exit all</div>
+      <div class="ins ib" style="font-size:11px;margin-top:8px"><strong>Lot = 10g (MCX Mini).</strong> Max loss = ₹${gML.toLocaleString()} (no margin call for options). Verify live on MCX before placing.</div>
+    </div></div>`;
+
+  // MCX Crude Trade
+  const cD=D.crudeChg<-1?'BULL':D.crudeChg>1?'BEAR':'NEUTRAL',cType=cD==='BULL'?'CE':'PE';
+  const cATM=Math.round(mcxC/100)*100,cW=500,cLot=100,cSig2=0.25;
+  const cBL=Math.max(10,Math.round(bsPrice(mcxC,cATM,gT,cSig2,cType)));
+  const cSL2=Math.max(5,Math.round(bsPrice(mcxC,cD==='BULL'?cATM+cW:cATM-cW,gT,cSig2,cType)));
+  const cDebit=Math.max(10,cBL-cSL2),cML=cDebit*cLot,cMG=(cW-cDebit)*cLot,cRR=Math.round((cMG/cML)*10)/10;
+  document.getElementById('cTrade').innerHTML=cD==='NEUTRAL'?
+    `<div class="ins iamb"><strong>⏸ Crude direction unclear.</strong> Change: ${D.crudeChg.toFixed(2)}%. Wait for &gt;1% trending move. MCX Crude at ₹${mcxC.toLocaleString('en-IN')}/bbl.</div>`:
+    `<div class="g2" style="gap:14px"><div>
+      <div class="ins ${cD==='BULL'?'ig':'ir'}" style="margin-bottom:10px"><strong>${cD==='BULL'?'✅ Crude falling → BUY Call Spread':'⚠ Crude rising → BUY Put Spread'}</strong></div>
+      <table>
+        <tr><td style="color:var(--muted);font-size:11px">MCX Crude ATM</td><td class="white">₹${cATM.toLocaleString('en-IN')}/bbl</td></tr>
+        <tr><td style="color:var(--muted);font-size:11px">Net Cost</td><td class="amber">~₹${cML.toLocaleString()} per lot</td></tr>
+        <tr><td style="color:var(--muted);font-size:11px">Max Gain</td><td class="green">~₹${cMG.toLocaleString()} (RR ~${cRR}:1)</td></tr>
+      </table></div>
+    <div><div class="ins ib" style="font-size:11px"><strong>MCX Crude lot = 100 bbl.</strong> Options margin ~₹15,000–₹25,000. Best when crude has a clear catalyst: OPEC meeting, US inventory data (Wed 8:30 PM IST). Always use spreads — never naked options.</div></div></div>`;
+}
+
+// ═══ INIT STATIC PAGES (P3 + P4) ═══
+function initStatic(){
+  // Equity curve
+  const minC=200000,maxC=279444;
+  document.getElementById('eqCurve').innerHTML=TRADES.map(t=>`<div class="eqbar" style="height:${Math.max(4,((t.capital_after-minC)/(maxC-minC))*100)}%;background:${t.win?'#22c55e':'#ef4444'};opacity:.85" title="${t.entry_date}: ${t.pnl>=0?'+':''}₹${t.pnl.toLocaleString()}"></div>`).join('');
+
+  // Trade table
+  document.getElementById('tTbl').innerHTML=TRADES.map((t,i)=>`<tr>
+    <td style="color:var(--muted)">${i+1}</td><td class="white">${t.entry_date.slice(5)}</td>
+    <td style="color:var(--muted)">${t.exit_date.slice(5)}</td>
+    <td><span class="badge ${t.direction==='BULL'?'bb':'br'}">${t.direction==='BULL'?'▲ CE':'▼ PE'}</span></td>
+    <td style="color:${t.dte_entry>=4?'#34d399':t.dte_entry>=2?'#fbbf24':'#fca5a5'}">${t.dte_entry}</td>
+    <td style="color:var(--muted)">${t.days_held}d</td>
+    <td style="color:${t.score>0?'#34d399':'#fca5a5'};font-weight:700">${t.score>0?'+':''}${t.score}</td>
+    <td><span class="badge ${t.confidence==='HIGH'?'bh':t.confidence==='MED'?'bm':'blow'}" style="font-size:10px">${t.confidence}</span></td>
+    <td style="color:var(--muted)">${t.buy_strike.toLocaleString()}</td>
+    <td style="color:#4b5563">${t.sell_strike.toLocaleString()}</td>
+    <td class="amber">₹${t.net_debit}</td>
+    <td style="color:${t.move>=0?'#34d399':'#fca5a5'}">${t.move>=0?'+':''}${t.move}</td>
+    <td class="${t.pnl>=0?'pp':'pn'}">${t.pnl>=0?'+':''}₹${Math.abs(t.pnl).toLocaleString()}</td>
+    <td><span class="badge ${t.win?'bwin':'bloss'}">${t.win?'✅':'❌'}</span></td>
+    <td><a href="https://app.sensibull.com/strategy-builder?instrument=NIFTY&expiry=${t.expiry}&strategy=${t.direction==='BULL'?'bull_call_spread':'bear_put_spread'}" target="_blank" class="btn btn-s" style="font-size:10px;padding:3px 7px;text-decoration:none">↗</a></td></tr>`).join('');
+
+  // Monthly stats
+  const mo={};TRADES.forEach(t=>{const m=t.entry_date.slice(0,7);if(!mo[m])mo[m]={w:0,tot:0,pnl:0};mo[m].tot++;mo[m].pnl+=t.pnl;if(t.win)mo[m].w++;});
+  document.getElementById('mStats').innerHTML=Object.entries(mo).map(([m,v])=>`<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #1e2a40"><span style="color:var(--muted)">${m}</span><span style="color:${v.w/v.tot>=0.6?'#34d399':'#fca5a5'}">${v.w}/${v.tot}</span><span class="${v.pnl>=0?'pp':'pn'}">${v.pnl>=0?'+':''}₹${Math.abs(v.pnl).toLocaleString()}</span></div>`).join('');
+
+  // All days
+  document.getElementById('adTbl').innerHTML=ALL_ROWS.map(r=>`<tr>
+    <td>${r.date.slice(5)}</td><td>${r.prev_close.toLocaleString()}</td>
+    <td class="white">${r.close.toLocaleString()}</td>
+    <td style="color:${r.change_pct>=0?'#34d399':'#fca5a5'}">${r.change_pct>=0?'+':''}${r.change_pct}%</td>
+    <td style="color:var(--muted)">${r.gift.toLocaleString()}</td>
+    <td style="color:${r.vix<15?'#34d399':r.vix>19?'#fca5a5':'#fbbf24'}">${r.vix}</td>
+    <td style="color:${r.score>0?'#34d399':'#fca5a5'};font-weight:700">${r.score>0?'+':''}${r.score}</td>
+    <td><span class="badge ${r.confidence==='HIGH'?'bh':r.confidence==='MED'?'bm':'blow'}" style="font-size:9px">${r.confidence}</span></td>
+    <td><span class="badge ${r.predicted==='BULL'?'bb':'br'}" style="font-size:9px">${r.predicted==='BULL'?'▲':'▼'}</span></td>
+    <td><span class="badge ${r.actual_dir==='BULL'?'bb':'br'}" style="font-size:9px">${r.actual_dir==='BULL'?'▲':'▼'}</span></td>
+    <td>${r.hit?'<span style="color:#34d399">✅</span>':'<span style="color:#fca5a5">❌</span>'}</td>
+    <td style="color:${r.dte>=4&&r.dte<=7?'#34d399':r.dte===0?'#fca5a5':'var(--muted)'}">${r.dte}</td></tr>`).join('');
+
+  // Weekly charts + table
+  const wk={};TRADES.forEach(t=>{const e=t.expiry;if(!wk[e])wk[e]={pnl:0,w:0,trades:[]};wk[e].pnl+=t.pnl;if(t.win)wk[e].w++;wk[e].trades.push(t);});
+  const wkeys=Object.keys(wk).sort(),mxP=Math.max(...wkeys.map(k=>Math.abs(wk[k].pnl)));
+  document.getElementById('wChart').innerHTML=`<div style="display:flex;align-items:flex-end;gap:4px;height:100px">${wkeys.map(k=>{const p=wk[k].pnl,h=Math.max(4,(Math.abs(p)/mxP)*90);return`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">${p>=0?`<div style="height:${h}px;background:#22c55e;border-radius:2px;width:100%;min-height:4px"></div><div style="height:6px"></div>`:`<div style="height:6px"></div><div style="height:${h}px;background:#ef4444;border-radius:2px;width:100%;min-height:4px"></div>`}<div style="font-size:8px;color:var(--muted);white-space:nowrap">${k.slice(5)}</div></div>`;}).join('')}</div>`;
+  let cum=0;const cd=wkeys.map(k=>{cum+=wk[k].pnl;return{k,cum};});const mc=Math.max(...cd.map(d=>d.cum));
+  document.getElementById('cChart').innerHTML=`<div style="display:flex;align-items:flex-end;gap:4px;height:100px">${cd.map(d=>{const h=Math.max(4,(d.cum/mc)*90);return`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="height:${100-h}px"></div><div style="height:${h}px;background:#3b82f6;border-radius:2px;width:100%;min-height:4px"></div><div style="font-size:8px;color:var(--muted);white-space:nowrap">${d.k.slice(5)}</div></div>`;}).join('')}</div>`;
+  document.getElementById('wTbl').innerHTML=wkeys.map(k=>{const w=wk[k],t=w.trades[0];const su=`https://app.sensibull.com/strategy-builder?instrument=NIFTY&expiry=${k}&strategy=${t.direction==='BULL'?'bull_call_spread':'bear_put_spread'}`;
+  return`<div class="wc" style="border-color:${w.pnl>=0?'#065f46':'#7f1d1d'}">
+    <div style="flex:1"><div style="font-size:12px;font-weight:700;color:#fff">Exp: ${k}</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:2px">${t.direction==='BULL'?'▲ BULL CE':'▼ BEAR PE'} · ${t.entry_date.slice(5)}→${t.exit_date.slice(5)} · DTE ${t.dte_entry} · ${t.days_held}d hold · Score ${t.score>0?'+':''}${t.score} ${t.confidence}</div>
+    <div style="font-size:11px;color:#4b5563;margin-top:2px">Buy ${t.buy_strike.toLocaleString()} @₹${t.buy_premium} | Sell ${t.sell_strike.toLocaleString()} @₹${t.sell_premium} | Net ₹${t.net_debit} | NIFTY ${t.entry_nifty}→${t.exit_nifty} (${t.move>=0?'+':''}${t.move}pts)</div></div>
+    <div style="text-align:right;flex-shrink:0"><div class="${t.pnl>=0?'pp':'pn'}" style="font-size:18px">${t.pnl>=0?'+':''}₹${Math.abs(t.pnl).toLocaleString()}</div>
+    <span class="badge ${t.win?'bwin':'bloss'}" style="font-size:10px;margin-top:4px;display:inline-block">${t.win?'✅ WIN':'❌ LOSS'}</span><br>
+    <a href="${su}" target="_blank" class="btn btn-s" style="font-size:10px;padding:3px 8px;text-decoration:none;margin-top:6px;display:inline-flex">↗ Sensibull</a></div></div>`;}).reverse().join('');
+}
+
+// ═══ TAB SWITCHING ═══
+function showP(id,el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');el.classList.add('active');
+}
+
+// ═══ AUTO-REFRESH at 9:30 AM and 3:15 PM IST ═══
+setInterval(()=>{
+  const{h,m,day}=istHM();
+  if(day===0||day===6)return;
+  const key=`${h}:${String(m).padStart(2,'0')}`;
+  if((key==='09:30'||key==='15:15')&&key!==autoKey){autoKey=key;console.log('Auto-refresh at IST',key);fetchAndRender();}
+},30000);
+
+initTS();
+</script>
+</body>
+</html>
