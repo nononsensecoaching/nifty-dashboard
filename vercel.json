@@ -1,16 +1,5 @@
 {
-  "crons": [
-    {
-      "path": "/api/daily-run",
-      "schedule": "45 9 * * 1-5"
-    },
-    {
-      "path": "/api/daily-run?snapshot=optionchain",
-      "schedule": "46 9 * * 1-5"
-    },
-    {
-      "path": "/api/verify-forecast",
-      "schedule": "30 4 * * 1"
-    }
-  ]
+    "routes": [
+          { "src": "/(.*)", "dest": "/nifty_command_centre_v2.html" }
+    ]
 }
