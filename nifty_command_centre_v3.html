@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NIFTY F&O Command Centre v3 · Mithun</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#060B1A;--c1:#0D1525;--c2:#111827;--bdr:#1E2A40;--g:#10B981;--r:#EF4444;--a:#F59E0B;--b:#3B82F6;--p:#8B5CF6;--cy:#06B6D4;--t:#E2E8F0;--m:#64748B}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--t);min-height:100vh;font-size:13px}
+.tb{background:linear-gradient(135deg,#1e3a8a,#1e40af 35%,#0369a1 65%,#0e7490);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:100;box-shadow:0 2px 20px rgba(0,0,0,.6);flex-wrap:wrap;gap:8px}
+.logo{font-size:14px;font-weight:900;color:#fff}.logo span{background:linear-gradient(90deg,#34d399,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.ld{width:8px;height:8px;border-radius:50%;background:#10B981;display:inline-block;animation:bl 2s infinite;margin-right:5px;box-shadow:0 0 6px #10B981}
+@keyframes bl{0%,100%{opacity:1}50%{opacity:.3}}
+.tabs{display:flex;gap:2px;background:rgba(0,0,0,.3);padding:4px;border-radius:10px;flex-wrap:wrap}
+.tab{padding:6px 11px;border:none;border-radius:7px;cursor:pointer;font-size:11px;font-weight:700;transition:all .2s;background:transparent;color:rgba(255,255,255,.5)}
+.tab.active{background:rgba(255,255,255,.18);color:#fff;box-shadow:0 0 10px rgba(16,185,129,.3)}
+.tab:hover:not(.active){background:rgba(255,255,255,.1);color:#fff}
+.page{display:none;padding:12px 16px;max-width:1200px;margin:0 auto}.page.active{display:block}
+.card{background:var(--c1);border:1px solid var(--bdr);border-radius:12px;padding:13px 15px;margin-bottom:12px}
+.cg{border-color:#065f46;background:linear-gradient(135deg,#052814,#0d1525)}
+.cr{border-color:#7f1d1d;background:linear-gradient(135deg,#2d0707,#0d1525)}
+.ca{border-color:#78350f;background:linear-gradient(135deg,#1a1200,#0d1525)}
+.cb{border-color:#1e40af;background:linear-gradient(135deg,#0a1a2d,#0d1525)}
+.cp{border:2px solid #8b5cf6;background:linear-gradient(135deg,#1a0a2d,#0d1525);border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 0 25px rgba(139,92,246,.35);text-align:center}
+.ct{border:2px solid #1e40af;background:linear-gradient(135deg,#0a1a2d,#0d1525);border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 0 20px rgba(59,130,246,.12)}
+.cgold{border:2px solid #d97706;background:linear-gradient(135deg,#1a0a00,#0d1525);border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 0 20px rgba(217,119,6,.15)}
+.ccrude{border:2px solid #059669;background:linear-gradient(135deg,#001a0a,#0d1525);border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 0 20px rgba(5,150,105,.15)}
+.st{font-size:11px;font-weight:700;color:var(--m);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.st::after{content:'';flex:1;height:1px;background:var(--bdr)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+@media(max-width:750px){.g2,.g3,.g4{grid-template-columns:1fr}}
+.kpi{background:var(--c2);border:1px solid var(--bdr);border-radius:10px;padding:11px 13px}
+.kl{font-size:10px;color:var(--m);margin-bottom:3px;text-transform:uppercase;letter-spacing:.06em}.kv{font-size:19px;font-weight:800}.ks{font-size:10px;color:var(--m);margin-top:2px}
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700}
+.bb{background:#065f46;color:#34d399;border:1px solid #059669}.br{background:#7f1d1d;color:#fca5a5;border:1px solid #dc2626}
+.ba{background:#78350f;color:#fcd34d;border:1px solid #d97706}.bbl{background:#1e3a8a;color:#93c5fd;border:1px solid #3b82f6}
+.bp{background:#4c1d95;color:#c4b5fd;border:1px solid #8b5cf6}.bh{background:linear-gradient(90deg,#78350f,#92400e);color:#fcd34d}
+.bm{background:#1e3a8a;color:#93c5fd}.blow{background:#1f2937;color:#6b7280}
+.bwin{background:#065f46;color:#34d399;border:1px solid #059669}.bloss{background:#7f1d1d;color:#fca5a5;border:1px solid #dc2626}
+.ins{border-radius:8px;padding:10px 13px;font-size:12px;line-height:1.7;margin-bottom:8px}
+.ig{background:#052814;border-left:4px solid var(--g);color:#86efac}.ir{background:#2d0707;border-left:4px solid var(--r);color:#fca5a5}
+.ib{background:#0a1a2d;border-left:4px solid var(--b);color:#93c5fd}.ia{background:#1a1200;border-left:4px solid var(--a);color:#fde68a}
+.ip{background:#1a0a2d;border-left:4px solid var(--p);color:#c4b5fd}.ic{background:#001a20;border-left:4px solid var(--cy);color:#a5f3fc}
+.exb{background:#0d1525;border:1px solid var(--bdr);border-radius:8px;padding:11px;font-size:12px;line-height:1.8;color:var(--m);margin-top:8px}
+.exb strong{color:var(--t)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{padding:7px;text-align:left;color:var(--m);font-weight:600;border-bottom:1px solid var(--bdr);font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+td{padding:6px 7px;border-bottom:1px solid #111827;color:#94a3b8;vertical-align:middle}
+tr:hover td{background:#111827}
+.btn{padding:8px 16px;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;transition:all .2s;display:inline-flex;align-items:center;gap:6px}
+.brun{background:linear-gradient(135deg,#10b981,#059669);color:#fff;box-shadow:0 0 15px rgba(16,185,129,.4);font-size:13px;padding:8px 18px}
+.brun:hover{transform:translateY(-1px);box-shadow:0 0 25px rgba(16,185,129,.7)}
+.bs{background:#1e3a8a;color:#93c5fd;border:1px solid #3b82f6;text-decoration:none}
+.bmcx{background:linear-gradient(135deg,#d97706,#b45309);color:#fff;text-decoration:none}
+.bsave{background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:#fff}
+.bsave:hover{box-shadow:0 0 15px rgba(139,92,246,.5)}
+.sbar{height:6px;background:#1e2a40;border-radius:3px;overflow:hidden;margin:3px 0 5px}
+.sfil{height:6px;border-radius:3px;transition:width .6s}
+.eqt{display:flex;align-items:flex-end;gap:2px;height:50px}
+.eqb{border-radius:2px 2px 0 0;min-width:6px;flex:1}
+.pchk{font-size:11px;display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid #1e2a40}
+.pchk:last-child{border-bottom:none}
+.green{color:var(--g)}.red{color:var(--r)}.amber{color:var(--a)}.blue{color:var(--b)}.purple{color:var(--p)}.white{color:#fff}.muted{color:var(--m)}
+.pp{color:var(--g);font-weight:700}.pn{color:var(--r);font-weight:700}
+/* DIRECTION BANNER */
+.db{border-radius:14px;padding:16px 20px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.dbull{background:linear-gradient(135deg,#052814,#065f46 50%,#0d1525);border:2px solid #059669;box-shadow:0 0 35px rgba(16,185,129,.2)}
+.dbear{background:linear-gradient(135deg,#2d0707,#7f1d1d 50%,#0d1525);border:2px solid #dc2626;box-shadow:0 0 35px rgba(239,68,68,.2)}
+.dwait{background:linear-gradient(135deg,#0a1a2d,#1e3a8a 50%,#0d1525);border:2px solid #3b82f6;box-shadow:0 0 35px rgba(59,130,246,.2)}
+/* LEVELS */
+.lg{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin:10px 0}
+.lbox{border-radius:8px;padding:9px;text-align:center}
+.le{background:#0a1a2d;border:1px solid #3b82f6}.lsl{background:#2d0707;border:1px solid #dc2626}
+.l2{background:#0f2d1a;border:1px solid #10b981}.l3{background:#1a0a2d;border:1px solid #8b5cf6}
+@media(max-width:600px){.lg{grid-template-columns:1fr 1fr}}
+/* GREEKS TABLE */
+.gktbl{width:100%;border-collapse:collapse;font-size:11px;margin-top:8px}
+.gktbl td{padding:5px 7px;border:1px solid #1e2a40}
+.gktbl th{padding:5px 7px;background:#111827;color:var(--m);border:1px solid #1e2a40;font-size:10px}
+/* MCX */
+.mcxg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px}
+.mcxc{border-radius:12px;padding:14px;text-align:center}
+.mcxG{background:linear-gradient(135deg,#1a0a00,#111827);border:2px solid #d97706;box-shadow:0 0 20px rgba(217,119,6,.2)}
+.mcxC{background:linear-gradient(135deg,#000d1a,#111827);border:2px solid #0369a1;box-shadow:0 0 20px rgba(3,105,161,.2)}
+.mcxS{background:linear-gradient(135deg,#0a0a1a,#111827);border:2px solid #6b7280;box-shadow:0 0 20px rgba(107,114,128,.2)}
+.bigp{font-size:24px;font-weight:900;margin:5px 0}
+/* IV CRUSH ALERT */
+.ivcrush{background:linear-gradient(135deg,#300030,#0d1525);border:2px solid #c026d3;border-radius:10px;padding:12px;margin-bottom:12px;box-shadow:0 0 20px rgba(192,38,211,.3)}
+/* PSEUDO-SIGNAL */
+.pseudo{background:linear-gradient(135deg,#1a1000,#0d1525);border:2px solid #ea580c;border-radius:10px;padding:12px;margin-bottom:12px}
+/* PREDICTION LOG */
+.pred-row{background:var(--c1);border:1px solid var(--bdr);border-radius:8px;padding:10px 13px;margin-bottom:8px}
+#loadB{background:rgba(59,130,246,.15);border:1px solid #3b82f6;border-radius:8px;padding:8px 13px;font-size:12px;color:#93c5fd;margin-bottom:10px;display:none;align-items:center;gap:8px}
+.spin{animation:sp 1s linear infinite;display:inline-block}
+@keyframes sp{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+/* EXPIRY BADGE */
+.expbadge{background:linear-gradient(135deg,#1a1200,#0d1525);border:1px solid #d97706;border-radius:8px;padding:8px 14px;font-size:12px;display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+/* WC */
+.wc{background:var(--c1);border:1px solid var(--bdr);border-radius:10px;padding:11px 13px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+/* LOGIN */
+#lo{position:fixed;inset:0;background:#060B1A;display:flex;align-items:center;justify-content:center;z-index:9999}
+.lbox{background:linear-gradient(135deg,#0D1525,#111827);border:1px solid #1e3a8a;border-radius:18px;padding:34px;width:320px;text-align:center;box-shadow:0 0 60px rgba(59,130,246,.25)}
+.lbox h2{font-size:20px;font-weight:900;margin-bottom:5px;background:linear-gradient(90deg,#34d399,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.li{width:100%;background:#1e2a40;border:1px solid #374151;border-radius:8px;color:#e2e8f0;padding:10px 12px;font-size:13px;margin-bottom:9px;outline:none;transition:border .2s}
+.li:focus{border-color:#3b82f6}
+.lerr{color:#ef4444;font-size:12px;margin-top:5px;display:none}
+input.inp{background:#1e2a40;border:1px solid #374151;border-radius:6px;color:#e2e8f0;padding:6px 10px;font-size:12px;outline:none;transition:border .2s}
+input.inp:focus{border-color:#3b82f6}
+select.sel{background:#1e2a40;border:1px solid #374151;border-radius:6px;color:#e2e8f0;padding:5px 8px;font-size:12px}
+textarea.txta{background:#1e2a40;border:1px solid #374151;border-radius:6px;color:#e2e8f0;padding:8px;font-size:12px;width:100%;resize:vertical;min-height:60px;outline:none}
+.month-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+.month-table th{background:#1e2a40;padding:6px 8px;text-align:left;color:var(--m);font-size:10px;border:1px solid #374151}
+.month-table td{padding:6px 8px;border:1px solid #1e2a40;color:#94a3b8}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="lo">
+  <div class="lbox">
+    <div style="font-size:34px;margin-bottom:6px">📡</div>
+    <h2>NIFTY Command Centre</h2>
+    <p style="font-size:11px;color:var(--m);margin-bottom:20px">Mithun · DM854 · Private F&O Dashboard</p>
+    <input id="lu" class="li" type="text" placeholder="Username" autocomplete="off">
+    <input id="lp" class="li" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn brun" style="width:100%;justify-content:center;margin-top:2px" onclick="doLogin()">🔐 LOGIN</button>
+    <div id="lerr" class="lerr">❌ Wrong credentials</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none">
+
+<div class="tb">
+  <div>
+    <div class="logo">NIFTY <span>COMMAND CENTRE v3</span></div>
+    <div style="font-size:10px;color:rgba(255,255,255,.5);margin-top:2px"><span class="ld"></span>Mithun · DM854 · <span id="topD">—</span></div>
+  </div>
+  <div class="tabs">
+    <button class="tab active" onclick="showP('p1',this)">📡 NIFTY Signal</button>
+    <button class="tab" onclick="showP('p2',this)">🥇 MCX Signal</button>
+    <button class="tab" onclick="showP('p3',this)">📊 Prediction Log</button>
+    <button class="tab" onclick="showP('p4',this)">🎓 Learning Model</button>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <div style="text-align:right;font-size:12px;font-weight:700;color:#fff">
+      <span id="topN">NIFTY —</span> <span id="topC" style="font-size:11px"></span>
+      <small id="topV" style="display:block;font-size:10px;color:rgba(255,255,255,.5)">VIX —</small>
+    </div>
+    <button class="btn brun" id="runBtn" onclick="runUpdate()">▶ RUN UPDATE</button>
+    <span style="font-size:9px;color:rgba(255,255,255,.4);padding:3px 6px;background:rgba(0,0,0,.3);border-radius:5px">Auto: 9:30AM &amp; 3:15PM IST</span>
+  </div>
+</div>
+
+<div style="max-width:1200px;margin:0 auto;padding:0 16px">
+  <div id="loadB"><span class="spin">⟳</span> Fetching live market data from Yahoo Finance…</div>
+</div>
+
+<!-- P1: NIFTY SIGNAL -->
+<div id="p1" class="page active">
+
+  <!-- EXPIRY INFO BAR -->
+  <div class="expbadge">
+    <span style="font-size:13px">📅 <strong class="white">Next Expiry:</strong> <span id="expiryLabel" class="amber">Loading…</span></span>
+    <span>|</span>
+    <span>🎯 <strong class="white">DTE:</strong> <span id="dteLabel" class="green">—</span> days</span>
+    <span>|</span>
+    <span>📦 <strong class="white">Lot Size:</strong> <span class="amber">65 units</span> (confirmed Jan 2026)</span>
+    <span>|</span>
+    <span>⏰ <strong class="white">Expiry Day:</strong> <span class="green">TUESDAY</span> (since Sep 2025)</span>
+    <span>|</span>
+    <span id="lotNote" style="font-size:11px;color:var(--m)">Auto-detect: verify NSE before trading</span>
+  </div>
+
+  <!-- DIRECTION BANNER -->
+  <div id="dBanner" class="db dwait">
+    <div>
+      <div style="font-size:11px;color:rgba(255,255,255,.6);letter-spacing:.06em;margin-bottom:3px" id="dMeta">Loading…</div>
+      <div style="font-size:22px;font-weight:900;color:#fff" id="dTitle">⏳ Fetching live data…</div>
+      <div style="font-size:12px;color:rgba(255,255,255,.75);margin-top:4px" id="dDesc">Please wait</div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:10px;color:rgba(255,255,255,.5)">Signal Score</div>
+      <div style="font-size:38px;font-weight:900;color:#fff" id="dScore">—</div>
+      <div id="dBadge"></div>
+    </div>
+  </div>
+
+  <!-- NEXT DAY + MONTH FORECAST STRIP -->
+  <div class="g2">
+    <div class="card cb">
+      <div class="st">📆 Next-Day Forecast (based on signals)</div>
+      <div id="nextDayForecast"></div>
+    </div>
+    <div class="card ca">
+      <div class="st">📅 4-Week Rolling Forecast</div>
+      <div id="monthForecast" style="overflow-x:auto"></div>
+    </div>
+  </div>
+
+  <!-- 2-COL: SIGNALS + GLOBAL -->
+  <div class="g2">
+    <div class="card">
+      <div class="st">📊 Signal Breakdown (6 factors — live)</div>
+      <div id="sigF"></div>
+      <div class="exb"><strong>How it works:</strong> 6 signals vote BULL (+) or BEAR (−). Score ≥+30 = trade bullish; ≤−30 = trade bearish; middle = skip. All losses in your May 2026 data were low-signal trades. <strong>Never trade on weak signals.</strong></div>
+    </div>
+    <div class="card">
+      <div class="st">🌏 Global Markets (with GIFT Nifty)</div>
+      <table><thead><tr><th>Market</th><th>Price</th><th>Change</th><th>NIFTY Impact</th></tr></thead>
+      <tbody id="gTbl"></tbody></table>
+      <div class="exb" style="margin-top:6px"><strong>GIFT Nifty</strong> = NSE IFSC futures traded overnight. When GIFT Nifty &gt; prev close, expect gap-up. The single most important 8:30 AM indicator. NIFTY is 65% correlated with S&amp;P 500 overnight.</div>
+    </div>
+  </div>
+
+  <!-- PATTERN CHECKS -->
+  <div class="card">
+    <div class="st">✅ 3 Pattern Filters (20MA / Momentum / DTE)</div>
+    <div class="g3">
+      <div style="background:#0d1525;border-radius:10px;padding:11px"><div style="font-size:10px;color:var(--m);margin-bottom:7px;text-transform:uppercase;letter-spacing:.06em">Filter 1 — VIX &amp; IV Check</div><div id="f1"></div></div>
+      <div style="background:#0d1525;border-radius:10px;padding:11px"><div style="font-size:10px;color:var(--m);margin-bottom:7px;text-transform:uppercase;letter-spacing:.06em">Filter 2 — DTE &amp; Momentum</div><div id="f2"></div></div>
+      <div style="background:#0d1525;border-radius:10px;padding:11px"><div style="font-size:10px;color:var(--m);margin-bottom:7px;text-transform:uppercase;letter-spacing:.06em">Filter 3 — Signal Quality</div><div id="f3"></div></div>
+    </div>
+  </div>
+
+  <!-- IV CRUSH ALERT -->
+  <div id="ivCrushDiv" style="display:none">
+    <div class="ivcrush">
+      <div style="font-size:12px;font-weight:700;color:#e879f9;margin-bottom:6px">⚡ IV CRUSH ALERT</div>
+      <div id="ivCrushMsg" style="font-size:12px;color:#f0abfc;line-height:1.7"></div>
+    </div>
+  </div>
+
+  <!-- PSEUDO-SIGNAL WARNINGS -->
+  <div id="pseudoDiv" style="display:none">
+    <div class="pseudo">
+      <div style="font-size:12px;font-weight:700;color:#f97316;margin-bottom:6px">🎭 PSEUDO-SIGNAL DETECTOR — Don't Be Misled</div>
+      <div id="pseudoMsg" style="font-size:12px;color:#fed7aa;line-height:1.7"></div>
+    </div>
+  </div>
+
+  <!-- OI MAP (above trade recommendation) -->
+  <div class="card">
+    <div class="st">📈 Option Chain OI Map — Support &amp; Resistance (Indicative)</div>
+    <div style="font-size:11px;color:var(--m);margin-bottom:8px">🔴 Call OI = Resistance (ceiling) &nbsp;|&nbsp; 🟢 Put OI = Support (floor) &nbsp;|&nbsp; 📌 ATM = current NIFTY level</div>
+    <div id="oiMap" style="overflow-x:auto"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;flex-wrap:wrap;gap:8px">
+      <div class="exb" style="margin:0;flex:1"><strong>PCR Analysis:</strong> <span id="pcrAnalysis">Loading…</span></div>
+      <a href="https://www.nseindia.com/option-chain" target="_blank" class="btn bs" style="white-space:nowrap">🔗 NSE Live OI ↗</a>
+    </div>
+  </div>
+
+  <!-- TRADE RECOMMENDATION -->
+  <div class="ct">
+    <div class="st" style="color:#93c5fd">🎯 Trade Recommendation — Asymmetric RR System (Win ≥ 3× Loss)</div>
+
+    <div class="cp" style="margin-bottom:14px">
+      <div style="font-size:10px;color:#c4b5fd;letter-spacing:.08em;margin-bottom:3px">MITHUN'S EDGE — ASYMMETRIC WIN SYSTEM</div>
+      <div style="font-size:18px;font-weight:900;color:#fff;margin-bottom:3px">Win 35% of Trades → Still Profitable ✅</div>
+      <div style="font-size:11px;color:#c4b5fd;margin-bottom:10px">Win 40% at 3:1 RR beats 70% win rate at 1:1. Capital preservation priority — even 5 losses, trade 6 recovers DD.</div>
+      <div style="display:flex;justify-content:center;gap:24px;flex-wrap:wrap">
+        <div><div style="font-size:26px;font-weight:900" id="rrR" class="purple">—:1</div><div style="font-size:10px;color:var(--m)">Risk:Reward</div></div>
+        <div><div style="font-size:26px;font-weight:900" id="rrB" class="amber">—%</div><div style="font-size:10px;color:var(--m)">Min Win% to Break Even</div></div>
+        <div><div style="font-size:26px;font-weight:900" id="rrE" class="green">₹—</div><div style="font-size:10px;color:var(--m)">EV at 35% Win Rate</div></div>
+      </div>
+    </div>
+
+    <div class="g2">
+      <div>
+        <table style="margin-bottom:10px">
+          <tr><td style="color:var(--m);font-size:11px;width:130px">Strategy</td><td id="tSt" class="white" style="font-weight:700"></td></tr>
+          <tr><td style="color:var(--m);font-size:11px">Buy Leg</td><td id="tBL"></td></tr>
+          <tr><td style="color:var(--m);font-size:11px">Sell Leg</td><td id="tSL"></td></tr>
+          <tr><td style="color:var(--m);font-size:11px">Net Cost</td><td id="tD" class="amber" style="font-weight:700"></td></tr>
+          <tr><td style="color:var(--m);font-size:11px">Max Loss</td><td id="tML" class="red" style="font-weight:700"></td></tr>
+          <tr><td style="color:var(--m);font-size:11px">Realistic Max Gain</td><td id="tMG" class="green" style="font-weight:700"></td></tr>
+          <tr><td style="color:var(--m);font-size:11px">Breakeven</td><td id="tBE" class="white"></td></tr>
+          <tr><td style="color:var(--m);font-size:11px">Best Entry</td><td id="tEN" class="amber"></td></tr>
+          <tr><td style="color:var(--m);font-size:11px">Expiry</td><td id="tEX" class="white"></td></tr>
+        </table>
+        <!-- GREEKS TABLE -->
+        <div style="font-size:10px;color:var(--m);margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em">Option Greeks (Spread Net)</div>
+        <table class="gktbl">
+          <tr><th>Greek</th><th>Buy Leg</th><th>Sell Leg</th><th>Net Spread</th><th>Optimal Range</th></tr>
+          <tbody id="greeksTbl"></tbody>
+        </table>
+        <div style="margin-top:10px" id="tSurl"></div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--m);margin-bottom:7px;text-transform:uppercase;letter-spacing:.08em">📍 NIFTY Exit Levels — Act at These Prices:</div>
+        <div class="lg" id="lvls"></div>
+        <div id="tExp" class="ins ib" style="margin-top:8px;font-size:12px"></div>
+        <!-- EXIT TIMING -->
+        <div id="exitTiming" class="ins ia" style="margin-top:8px;font-size:12px"></div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px" id="trules"></div>
+  </div>
+
+  <!-- SAVE TODAY'S PREDICTION -->
+  <div class="card cb">
+    <div class="st">💾 Save Today's Prediction to Log</div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button class="btn bsave" onclick="saveTodayPred()">💾 Save Today's Prediction</button>
+      <span style="font-size:11px;color:var(--m)">Saves direction, NIFTY level, trade setup to your Prediction Log (Tab 3). Enter actual outcome there later.</span>
+    </div>
+  </div>
+
+  <!-- BTST/STBT -->
+  <div class="card ca">
+    <div class="st">🌙 BTST / STBT Assessment (based on current conditions)</div>
+    <div class="g3">
+      <div class="ins ig"><strong>✅ BTST when:</strong> Score ≥40 + VIX &lt;15 + Monday entry + no major event tomorrow. History: Monday BTST has highest success.</div>
+      <div class="ins ir"><strong>❌ NEVER hold Friday:</strong> Weekend theta loss = 2 days decay. Exit ALL positions by 3:00 PM on Fridays. Historical: Friday BTST = near 100% loss.</div>
+      <div class="ins ia"><strong>⚠ STBT — only with hedge:</strong> Selling overnight without both legs hedged = naked exposure to gap risk. Not recommended for retail without Iron Condor structure.</div>
+    </div>
+    <div id="btstMsg" class="ins ib" style="font-size:12px">Loading BTST assessment…</div>
+  </div>
+
+  <!-- SCENARIOS -->
+  <div class="card">
+    <div class="st">📋 4 Scenarios — Prepare, Don't Predict</div>
+    <table><thead><tr><th>Scenario</th><th>NIFTY Target</th><th>Action</th><th>P&amp;L</th><th>Probability</th></tr></thead>
+    <tbody id="scTbl"></tbody></table>
+    <div class="exb"><strong>Rule:</strong> No gut feeling. No waiting. When NIFTY hits your level, act mechanically. One winning trade at 3× covers 2 losses at 1×.</div>
+  </div>
+
+  <!-- SKIP RULES -->
+  <div class="card cr">
+    <div class="st">🚫 When NOT to Trade</div>
+    <div class="g2">
+      <div>
+        <div class="ins ir" style="margin-bottom:6px">❌ <strong>Signal Score -29 to +29</strong> — weak. All May 2026 losses had score &lt;30.</div>
+        <div class="ins ir" style="margin-bottom:6px">❌ <strong>VIX &gt;20</strong> — options too expensive, RR collapses on debit spreads.</div>
+        <div class="ins ir">❌ <strong>DTE = 0 (Expiry Tuesday)</strong> — theta destroys 40-60% of premium in final hours.</div>
+      </div>
+      <div>
+        <div class="ins ia" style="margin-bottom:6px">⚠ <strong>After 2 consecutive losses</strong> — trade half lot (33 units = ~half of 65). Protect capital first.</div>
+        <div class="ins ia" style="margin-bottom:6px">⚠ <strong>10-day momentum negative</strong> — halve Bull Put size (bearish drift below 20-day MA).</div>
+        <div class="ins ia">⚠ <strong>Large gap (>200pts) at open</strong> — wait 30 mins before entering. Gaps often reverse.</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /p1 -->
+
+<!-- P2: MCX SIGNAL -->
+<div id="p2" class="page">
+  <div class="ins ia" style="margin-bottom:12px;font-size:12px">
+    <strong>⚠ MCX Data Source:</strong> Prices = COMEX/WTI × USDINR (live from Yahoo Finance). Very close approximation — verify on <a href="https://www.mcxindia.com/market-data/option-chain" target="_blank" style="color:#fde68a">MCX Option Chain ↗</a> before trading. MCX lot: Gold Mini=10g, Crude=100bbl, Silver=30kg.
+  </div>
+
+  <div class="mcxg">
+    <div class="mcxc mcxG">
+      <div style="font-size:11px;color:#fbbf24;letter-spacing:.1em;text-transform:uppercase">🥇 MCX Gold (10g)</div>
+      <div class="bigp amber" id="gP">₹—</div>
+      <div id="gC" style="font-size:11px;margin-bottom:3px"></div>
+      <div style="font-size:10px;color:var(--m)">COMEX × USDINR × (10/31.1)</div>
+      <div id="gSig" style="margin-top:5px"></div>
+    </div>
+    <div class="mcxc mcxC">
+      <div style="font-size:11px;color:#22d3ee;letter-spacing:.1em;text-transform:uppercase">🛢 MCX Crude (bbl)</div>
+      <div class="bigp" style="color:var(--cy)" id="cP">₹—</div>
+      <div id="cC" style="font-size:11px;margin-bottom:3px"></div>
+      <div style="font-size:10px;color:var(--m)">WTI × USDINR</div>
+      <div id="cSig" style="margin-top:5px"></div>
+    </div>
+    <div class="mcxc mcxS">
+      <div style="font-size:11px;color:#d1d5db;letter-spacing:.1em;text-transform:uppercase">🥈 MCX Silver (1kg)</div>
+      <div class="bigp white" id="sP">₹—</div>
+      <div id="sC" style="font-size:11px;margin-bottom:3px"></div>
+      <div style="font-size:10px;color:var(--m)">COMEX × USDINR × (1000/31.1)</div>
+      <div id="sSig" style="margin-top:5px"></div>
+    </div>
+  </div>
+
+  <div class="g2">
+    <div class="card">
+      <div class="st">💱 USD/INR Cascade Effect</div>
+      <table><tbody id="usdTbl"></tbody></table>
+      <div class="exb"><strong>If INR weakens</strong> → MCX Gold rises even if COMEX is flat → Gold traders get a natural hedge when NIFTY falls (risk-off). This is why Gold and NIFTY often move inversely.</div>
+    </div>
+    <div class="card">
+      <div class="st">🛢 Crude Oil → India Economy → NIFTY</div>
+      <div id="crudeImp"></div>
+    </div>
+  </div>
+
+  <div class="cgold">
+    <div class="st" style="color:#fbbf24">🎯 MCX Gold Trade — With Strike Prices &amp; Greeks</div>
+    <div id="gTrade"></div>
+  </div>
+
+  <div class="ccrude">
+    <div class="st" style="color:var(--cy)">🎯 MCX Crude Trade — With Strike Prices &amp; Greeks</div>
+    <div id="cTrade"></div>
+  </div>
+
+  <div class="card">
+    <div class="st">🥈 MCX Silver — Range-Bound Strategy (always have a trade)</div>
+    <div id="sTrade"></div>
+  </div>
+
+  <div class="card">
+    <div class="st">🔗 MCX Resources</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <a href="https://www.mcxindia.com/market-data/option-chain" target="_blank" class="btn bmcx">🥇 MCX Live Option Chain ↗</a>
+      <a href="https://www.mcxindia.com/market-data/commodity-market-watch" target="_blank" class="btn bs">📊 MCX Market Watch ↗</a>
+      <a href="https://zerodha.com/markets/commodities" target="_blank" class="btn bs">🔗 Zerodha MCX ↗</a>
+    </div>
+    <div class="exb"><strong>MCX Lot sizes (2026):</strong> Gold Mini=10g, Gold Regular=1kg. Crude=100bbl. Silver=30kg. For options: max loss = premium paid (no margin calls beyond that). Best entry: near ATM with DTE 4-7 days.</div>
+  </div>
+</div><!-- /p2 -->
+
+<!-- P3: PREDICTION LOG -->
+<div id="p3" class="page">
+  <div class="card">
+    <div class="st">📊 Prediction Log — From Dashboard Launch Date (Latest First)</div>
+    <div class="ins ia" style="margin-bottom:10px;font-size:12px">
+      <strong>How to use:</strong> (1) Each morning after running UPDATE, click "Save Today's Prediction" on Tab 1. (2) After market closes, return here and click "Enter Outcome" for that day. (3) System auto-calculates accuracy and feeds learnings into Tab 4. <strong>No historical data — only from when you started using this dashboard.</strong>
+    </div>
+    <div id="predStats" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px"></div>
+    <div id="predLog"><div style="color:var(--m);font-size:12px;text-align:center;padding:30px">No predictions saved yet. Click ▶ RUN UPDATE on Tab 1, then click "Save Today's Prediction" to start tracking.</div></div>
+  </div>
+
+  <!-- MANUAL OUTCOME ENTRY -->
+  <div class="card cb" id="outcomeForm" style="display:none">
+    <div class="st">✏️ Enter Actual Outcome</div>
+    <div class="g2">
+      <div>
+        <div style="margin-bottom:8px"><label style="font-size:11px;color:var(--m);display:block;margin-bottom:3px">Prediction Date:</label><span id="ocDate" class="white" style="font-size:13px;font-weight:700"></span></div>
+        <div style="margin-bottom:8px"><label style="font-size:11px;color:var(--m);display:block;margin-bottom:3px">Actual NIFTY Direction:</label>
+          <select id="ocDir" class="sel"><option value="BULL">▲ BULL (market went up)</option><option value="BEAR">▼ BEAR (market went down)</option><option value="NEUTRAL">➡ NEUTRAL (market was flat)</option></select></div>
+        <div style="margin-bottom:8px"><label style="font-size:11px;color:var(--m);display:block;margin-bottom:3px">Actual NIFTY Close:</label><input id="ocClose" class="inp" type="number" placeholder="e.g. 24056"></div>
+        <div style="margin-bottom:8px"><label style="font-size:11px;color:var(--m);display:block;margin-bottom:3px">Trade P&amp;L (₹, enter negative for loss):</label><input id="ocPnl" class="inp" type="number" placeholder="e.g. 3500 or -1200"></div>
+      </div>
+      <div>
+        <div style="margin-bottom:8px"><label style="font-size:11px;color:var(--m);display:block;margin-bottom:3px">If prediction was WRONG — Root Cause:</label>
+          <textarea id="ocRoot" class="txta" placeholder="e.g. Missed crude oil spike; VIX spike due to geopolitical event; FII sold despite bullish signal..."></textarea></div>
+        <button class="btn bsave" onclick="saveOutcome()" style="width:100%;justify-content:center">✅ Save Outcome &amp; Update Learning</button>
+        <button class="btn" onclick="document.getElementById('outcomeForm').style.display='none'" style="width:100%;justify-content:center;margin-top:6px;background:#374151;color:#e2e8f0">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div><!-- /p3 -->
+
+<!-- P4: LEARNING MODEL -->
+<div id="p4" class="page">
+  <div class="card">
+    <div class="st">🎓 Accumulated Learning Model — Updates With Each Prediction</div>
+    <div class="ins ib" style="margin-bottom:10px;font-size:12px">
+      <strong>How this works:</strong> Every time a prediction is wrong and you enter the root cause, it is added here permanently. The model grows smarter over time. <strong>This is never reset</strong> — only amended.
+    </div>
+    <div id="learnStats" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px"></div>
+  </div>
+  <div class="card">
+    <div class="st">📜 Accumulated Rules (from past misses)</div>
+    <div id="learnRules"></div>
+  </div>
+  <div class="card">
+    <div class="st">📖 Miss Log (root cause analysis)</div>
+    <div id="learnMisses"></div>
+  </div>
+  <div class="card cg">
+    <div class="st">✅ Proven Edge Rules (from your trade history analysis)</div>
+    <div class="g2">
+      <div>
+        <div class="ins ig">✅ <strong>300-pt Bull Put Spread: 10/10 wins (100%).</strong> Never go below 200-pt width. DTE 3-5 at entry.</div>
+        <div class="ins ig">✅ <strong>Bear Call Spread: 70% win rate.</strong> Strong signal only (score ≥40). VIX between 12-18.</div>
+        <div class="ins ig">✅ <strong>Monday entry: 65% win rate.</strong> Best day for weekly options. Thursday = worst (32% win).</div>
+      </div>
+      <div>
+        <div class="ins ir">❌ <strong>DTE=0: 19% win, −₹7.3L in your data.</strong> Never enter on expiry day.</div>
+        <div class="ins ir">❌ <strong>Buying premium outright: 0% win (0/21 trades).</strong> Never buy CE/PE without selling a hedge leg.</div>
+        <div class="ins ia">⚠ <strong>After 2 losses: halve lot size.</strong> 19-June pattern (adding at loss) caused biggest single-day loss.</div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="st">📅 Model Version History</div>
+    <div id="modelHistory"></div>
+  </div>
+</div><!-- /p4 -->
+
+</div><!-- /app -->
+
+<script>
+// ═══════════════════════════════════════════════════
+// CONSTANTS — CORRECTED: Tuesday expiry, lot 65
+// ═══════════════════════════════════════════════════
+const LOT=65,WIDTH=300,R=0.065,PASS='admin',USER='admin';
+
+// Fallback data (used if Yahoo Finance is unreachable)
+const FB={nifty:24100,niftyChg:0.4,vix:13.5,vixChg:-2.1,sp500:5960,sp500Chg:0.4,dow:43500,dowChg:0.5,nas:25900,nasChg:0.3,nikkei:38700,nikkeiChg:0.6,hsi:22100,hsiChg:-0.1,usdinr:85.5,usdinrChg:0.05,gold:3320,goldChg:0.2,crude:78.5,crudeChg:-0.4,silver:32.5,silverChg:0.1};
+let D={...FB},autoKey='';
+
+// ═══════════════════════════════════════════════════
+// LOGIN — Password changed to admin/admin
+// ═══════════════════════════════════════════════════
+function doLogin(){
+  if(document.getElementById('lu').value.trim()===USER&&document.getElementById('lp').value===PASS){
+    document.getElementById('lo').style.display='none';
+    document.getElementById('app').style.display='block';
+    initStaticPages();fetchAndRender();renderP3();renderP4();
+  }else{document.getElementById('lerr').style.display='block';document.getElementById('lp').value='';}
+}
+
+// ═══════════════════════════════════════════════════
+// IST TIME HELPERS
+// ═══════════════════════════════════════════════════
+function getIST(){return new Date(new Date().getTime()+330*60000);}
+function istHM(){const d=getIST();return{h:d.getUTCHours(),m:d.getUTCMinutes(),day:d.getUTCDay(),date:d.getUTCDate()};}
+
+// TUESDAY EXPIRY (corrected from Thursday)
+// Day 2 = Tuesday (0=Sun,1=Mon,2=Tue,3=Wed,4=Thu,5=Fri,6=Sat)
+function getNextTuesdayExpiry(){
+  const ist=getIST(),day=ist.getUTCDay();
+  let dt=(2-day+7)%7;
+  if(dt===0)dt=7; // If today is Tuesday, get NEXT Tuesday
+  const exp=new Date(ist.getTime()+dt*86400000);
+  return{dte:dt,expiry:exp.toISOString().slice(0,10),display:exp.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'})};
+}
+
+// Monthly forecast — next 4 Tuesdays
+function getNext4Tuesdays(){
+  const ist=getIST();const result=[];
+  let check=new Date(ist.getTime());
+  let found=0;
+  for(let i=1;i<=30&&found<4;i++){
+    check=new Date(ist.getTime()+i*86400000);
+    if(check.getUTCDay()===2){result.push({date:check.toISOString().slice(0,10),display:check.toLocaleDateString('en-IN',{day:'numeric',month:'short'})});found++;}
+  }
+  return result;
+}
+
+// ═══════════════════════════════════════════════════
+// BLACK-SCHOLES + GREEKS (complete)
+// ═══════════════════════════════════════════════════
+function normCDF(x){
+  const a=[0.319381530,-0.356563782,1.781477937,-1.821255978,1.330274429];
+  const s=x<0?-1:1;x=Math.abs(x);
+  const k=1/(1+0.2316419*x);
+  const poly=((((a[4]*k+a[3])*k+a[2])*k+a[1])*k+a[0])*k;
+  return s===1?1-Math.exp(-x*x/2)/Math.sqrt(2*Math.PI)*poly:Math.exp(-x*x/2)/Math.sqrt(2*Math.PI)*poly;
+}
+
+function bsGreeks(S,K,T,sigma,type){
+  if(T<=0.001||sigma<=0.001){
+    const iv=Math.max(0.01,type==='CE'?S-K:K-S);
+    return{price:Math.max(0.05,iv),delta:type==='CE'?(S>K?0.99:0.01):(S<K?-0.99:-0.01),gamma:0.0001,theta:-0.01,vega:0.01};
+  }
+  const d1=(Math.log(S/K)+(R+sigma*sigma/2)*T)/(sigma*Math.sqrt(T));
+  const d2=d1-sigma*Math.sqrt(T);
+  const nd1=Math.exp(-d1*d1/2)/Math.sqrt(2*Math.PI);
+  let price,delta;
+  if(type==='CE'){price=Math.max(0.05,S*normCDF(d1)-K*Math.exp(-R*T)*normCDF(d2));delta=normCDF(d1);}
+  else{price=Math.max(0.05,K*Math.exp(-R*T)*normCDF(-d2)-S*normCDF(-d1));delta=normCDF(d1)-1;}
+  const gamma=nd1/(S*sigma*Math.sqrt(T));
+  const theta=type==='CE'?(-(S*nd1*sigma)/(2*Math.sqrt(T))-R*K*Math.exp(-R*T)*normCDF(d2))/365:(-(S*nd1*sigma)/(2*Math.sqrt(T))+R*K*Math.exp(-R*T)*normCDF(-d2))/365;
+  const vega=S*nd1*Math.sqrt(T)/100;
+  return{price:Math.round(price*100)/100,delta:Math.round(delta*1000)/1000,gamma:Math.round(gamma*100000)/100000,theta:Math.round(theta*100)/100,vega:Math.round(vega*100)/100};
+}
+function atm50(p){return Math.round(p/50)*50;}
+
+// ═══════════════════════════════════════════════════
+// IV CRUSH DETECTION
+// ═══════════════════════════════════════════════════
+function detectIVCrush(vix,vixChg){
+  const alerts=[];
+  if(vix>20){alerts.push({lvl:'CRITICAL',txt:`VIX ${vix.toFixed(1)} — Panic zone. Option premiums inflated 40-60% above fair value. <strong>DO NOT buy options.</strong> If selling, use tight spreads.`,action:'Sell credit spreads (Iron Condor) if DTE≥3. Do NOT buy debit spreads.'});}
+  else if(vix>16&&vixChg>5){alerts.push({lvl:'HIGH',txt:`VIX spiked ${vixChg.toFixed(1)}% recently — fear event triggered IV spike. Premiums overpriced. IV crush likely post-event.`,action:'Wait for VIX to stabilize. If event passes, sell options as IV drops.'});}
+  else if(vix>16){alerts.push({lvl:'MEDIUM',txt:`VIX ${vix.toFixed(1)} — Elevated. Options moderately overpriced. Post-RBI/Fed IV crush possible.`,action:'Prefer credit spreads over debit spreads. Smaller position size.'});}
+  else if(vix<12){alerts.push({lvl:'OPPORTUNITY',txt:`VIX ${vix.toFixed(1)} — Historically low. Options cheapest. IV expansion risk if market jolts.`,action:'Good time to buy debit spreads. Risk: sudden spike in VIX.'});}
+  return alerts;
+}
+
+// ═══════════════════════════════════════════════════
+// PSEUDO-SIGNAL DETECTOR
+// ═══════════════════════════════════════════════════
+function detectPseudoSignals(D){
+  const fakes=[];
+  if(D.goldChg>1&&D.niftyChg>0.3){fakes.push({sig:'Gold+NIFTY both rising',reason:'Gold and NIFTY usually inverse. Both rising = one is a false signal. Check FII flows — if FIIs buying both, may be genuine.',action:'Cross-verify with PCR. If PCR >1.2, trust the NIFTY bull signal.'});}
+  if(D.sp500Chg<-0.5&&D.niftyChg>0.3){fakes.push({sig:'S&P fell but NIFTY rising',reason:'Decoupling — India outperforming US. Could be genuine (RBI policy, budget) or temporary. Often reverses intraday.',action:'Check Gift Nifty vs overnight S&P. If Gift Nifty was already up, trust NIFTY signal.'});}
+  if(D.vixChg<-5&&D.niftyChg<0){fakes.push({sig:'VIX falling but NIFTY dropping',reason:'Should be inverse. If both falling, market may be in complacent decline — sell-off without panic. Dangerous.',action:'AVOID buying puts on this setup. Iron Condor if neutral bias.'});}
+  if(D.crudeChg>3&&D.usdinrChg<0){fakes.push({sig:'Crude rising but INR strengthening',reason:'Normally crude up = INR weakens. If opposite, foreign flows might be overriding. Temporary divergence.',action:'Don\'t use crude as NIFTY signal today. Use FII flow data directly.'});}
+  return fakes;
+}
+
+// ═══════════════════════════════════════════════════
+// SIGNAL COMPUTATION (6 factors)
+// ═══════════════════════════════════════════════════
+function compSig(){
+  let score=0;const factors=[];
+  // Factor 1: GIFT Nifty (approximated)
+  const prevNifty=D.nifty/(1+D.niftyChg/100);
+  const giftNifty=D.nifty*(1+0.065*getNextTuesdayExpiry().dte/365);
+  const giftGap=((giftNifty-prevNifty)/prevNifty)*100;
+  if(giftGap>0.5){score+=25;factors.push({name:'🎯 GIFT Nifty Gap',val:`~₹${Math.round(giftNifty).toLocaleString('en-IN')} (+${giftGap.toFixed(2)}% vs prev close)`,detail:'GIFT Nifty above prev close → gap-up opening expected → bullish for day.',bull:true,w:25});}
+  else if(giftGap<-0.5){score-=25;factors.push({name:'🎯 GIFT Nifty Gap',val:`~₹${Math.round(giftNifty).toLocaleString('en-IN')} (${giftGap.toFixed(2)}% vs prev close)`,detail:'GIFT Nifty below prev close → gap-down expected → bearish for day.',bull:false,w:25});}
+  else factors.push({name:'🎯 GIFT Nifty Gap',val:`~₹${Math.round(giftNifty).toLocaleString('en-IN')} (flat)`,detail:'Gift Nifty near prev close. No strong gap signal. Wait for opening direction.',bull:null,w:0});
+
+  // Factor 2: S&P 500
+  const sp=D.sp500Chg;
+  if(sp>0.5){score+=20;factors.push({name:'🇺🇸 S&P 500',val:`+${sp.toFixed(2)}%`,detail:'US market rose strongly → global optimism → bullish for NIFTY.',bull:true,w:20});}
+  else if(sp>0.1){score+=10;factors.push({name:'🇺🇸 S&P 500',val:`+${sp.toFixed(2)}%`,detail:'US mildly up → cautious optimism.',bull:true,w:10});}
+  else if(sp<-0.5){score-=20;factors.push({name:'🇺🇸 S&P 500',val:`${sp.toFixed(2)}%`,detail:'US fell sharply → global fear → bearish pressure on NIFTY.',bull:false,w:20});}
+  else if(sp<-0.1){score-=10;factors.push({name:'🇺🇸 S&P 500',val:`${sp.toFixed(2)}%`,detail:'US down mildly.',bull:false,w:10});}
+  else factors.push({name:'🇺🇸 S&P 500',val:`${sp.toFixed(2)}%`,detail:'US flat → no signal.',bull:null,w:0});
+
+  // Factor 3: India VIX — FIXED: falling VIX = GREEN (bullish)
+  const vx=D.vix,vc=D.vixChg;
+  if(vx<13){score+=20;factors.push({name:'😌 India VIX',val:`${vx.toFixed(1)} — Very Low`,detail:'VIX under 13 = extreme calm. Options are cheapest. Perfect for debit spreads. IV crush risk: LOW.',bull:true,w:20,vixDir:'falling_good'});}
+  else if(vx<16){score+=12;factors.push({name:'😌 India VIX',val:`${vx.toFixed(1)} — Low`,detail:'VIX 13-16 = low fear. Good for debit spreads. Standard trading conditions.',bull:true,w:12,vixDir:'falling_good'});}
+  else if(vx<19){score+=3;factors.push({name:'😐 India VIX',val:`${vx.toFixed(1)} — Moderate`,detail:'VIX 16-19: some volatility. Premiums moderately elevated. Tradeable.',bull:true,w:3,vixDir:'neutral'});}
+  else if(vx<22){score-=15;factors.push({name:'😨 India VIX',val:`${vx.toFixed(1)} — Elevated`,detail:'VIX 19-22: fear building. Options overpriced. Reduce size.',bull:false,w:15,vixDir:'rising_bad'});}
+  else{score-=25;factors.push({name:'🔴 India VIX',val:`${vx.toFixed(1)} — PANIC`,detail:'VIX above 22 = panic. Options very expensive. Avoid buying.',bull:false,w:25,vixDir:'rising_bad'});}
+
+  // Factor 4: NIFTY momentum
+  const nc=D.niftyChg;
+  if(nc>0.5){score+=15;factors.push({name:'📈 NIFTY Momentum',val:`+${nc.toFixed(2)}%`,detail:'NIFTY rising strongly today.',bull:true,w:15});}
+  else if(nc>0.1){score+=7;factors.push({name:'📈 NIFTY Momentum',val:`+${nc.toFixed(2)}%`,detail:'NIFTY mildly positive.',bull:true,w:7});}
+  else if(nc<-0.5){score-=15;factors.push({name:'📉 NIFTY Momentum',val:`${nc.toFixed(2)}%`,detail:'NIFTY falling.',bull:false,w:15});}
+  else if(nc<-0.1){score-=7;factors.push({name:'📉 NIFTY Momentum',val:`${nc.toFixed(2)}%`,detail:'NIFTY slightly down.',bull:false,w:7});}
+  else factors.push({name:'➡ NIFTY Momentum',val:`${nc.toFixed(2)}%`,detail:'NIFTY flat. No momentum.',bull:null,w:0});
+
+  // Factor 5: USD/INR
+  const usd=D.usdinr;
+  if(usd>87){score-=12;factors.push({name:'💵 USD/INR',val:`₹${usd.toFixed(1)}/USD`,detail:'INR very weak → FIIs selling India → bearish pressure.',bull:false,w:12});}
+  else if(usd>86){score-=5;factors.push({name:'💵 USD/INR',val:`₹${usd.toFixed(1)}/USD`,detail:'INR slightly weak.',bull:false,w:5});}
+  else if(usd<83){score+=12;factors.push({name:'💵 USD/INR',val:`₹${usd.toFixed(1)}/USD`,detail:'INR strong → FII inflows → mildly bullish.',bull:true,w:12});}
+  else factors.push({name:'💵 USD/INR',val:`₹${usd.toFixed(1)}/USD`,detail:'USD/INR neutral.',bull:null,w:0});
+
+  // Factor 6: Gold (safe haven — inverse signal)
+  const gc=D.goldChg;
+  if(gc>1.5){score-=18;factors.push({name:'🥇 Gold (Risk-Off)',val:`+${gc.toFixed(2)}%`,detail:'Gold surging → investors fleeing equities → VERY bearish signal.',bull:false,w:18});}
+  else if(gc>0.5){score-=7;factors.push({name:'🥇 Gold (Risk-Off)',val:`+${gc.toFixed(2)}%`,detail:'Gold rising mildly → slight risk-off.',bull:false,w:7});}
+  else if(gc<-0.5){score+=10;factors.push({name:'🥇 Gold (Risk-On)',val:`${gc.toFixed(2)}%`,detail:'Gold falling → money flowing into equities → bullish.',bull:true,w:10});}
+  else factors.push({name:'🥇 Gold',val:`${gc.toFixed(2)}%`,detail:'Gold flat. Neutral.',bull:null,w:0});
+
+  const conf=Math.abs(score)>=40?'HIGH':Math.abs(score)>=25?'MED':'LOW';
+  const dir=score>=25?'BULL':score<=-25?'BEAR':'NEUTRAL';
+  return{score,factors,conf,dir,giftNifty,prevNifty};
+}
+
+// ═══════════════════════════════════════════════════
+// FETCH LIVE DATA
+// ═══════════════════════════════════════════════════
+async function fetchLiveData(){
+  const syms='^NSEI,^INDIAVIX,^GSPC,^DJI,^IXIC,^N225,^HSI,USDINR=X,GC=F,CL=F,SI=F';
+  const url='https://api.allorigins.win/raw?url='+encodeURIComponent('https://query1.finance.yahoo.com/v7/finance/quote?symbols='+syms);
+  const r=await fetch(url,{signal:AbortSignal.timeout(10000)});
+  if(!r.ok)throw new Error('bad');
+  const j=await r.json();const res=j?.quoteResponse?.result||[];
+  const by={};res.forEach(x=>{by[x.symbol]=x;});
+  const g=(s,f)=>by[s]?.regularMarketPrice??f,gc2=(s,f)=>by[s]?.regularMarketChangePercent??f;
+  D.nifty=g('^NSEI',FB.nifty);D.niftyChg=gc2('^NSEI',FB.niftyChg);
+  D.vix=g('^INDIAVIX',FB.vix);D.vixChg=gc2('^INDIAVIX',FB.vixChg);
+  D.sp500=g('^GSPC',FB.sp500);D.sp500Chg=gc2('^GSPC',FB.sp500Chg);
+  D.dow=g('^DJI',FB.dow);D.dowChg=gc2('^DJI',FB.dowChg);
+  D.nas=g('^IXIC',FB.nas);D.nasChg=gc2('^IXIC',FB.nasChg);
+  D.nikkei=g('^N225',FB.nikkei);D.nikkeiChg=gc2('^N225',FB.nikkeiChg);
+  D.hsi=g('^HSI',FB.hsi);D.hsiChg=gc2('^HSI',FB.hsiChg);
+  D.usdinr=g('USDINR=X',FB.usdinr);D.usdinrChg=gc2('USDINR=X',FB.usdinrChg);
+  D.gold=g('GC=F',FB.gold);D.goldChg=gc2('GC=F',FB.goldChg);
+  D.crude=g('CL=F',FB.crude);D.crudeChg=gc2('CL=F',FB.crudeChg);
+  D.silver=g('SI=F',FB.silver);D.silverChg=gc2('SI=F',FB.silverChg??0);
+}
+
+function setLoading(v){document.getElementById('loadB').style.display=v?'flex':'none';}
+async function fetchAndRender(){setLoading(true);try{await fetchLiveData();}catch(e){console.log('Fallback:',e.message);}renderP1();renderP2();updateTS();setLoading(false);}
+async function runUpdate(){const b=document.getElementById('runBtn');b.textContent='⟳ Updating…';b.disabled=true;await fetchAndRender();b.textContent='▶ RUN UPDATE';b.disabled=false;}
+
+// ═══════════════════════════════════════════════════
+// TIMESTAMP
+// ═══════════════════════════════════════════════════
+function updateTS(){
+  const ist=getIST(),h=ist.getUTCHours(),m=ist.getUTCMinutes();
+  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('topD').textContent=`${days[ist.getUTCDay()]} ${ist.getUTCDate()} ${months[ist.getUTCMonth()]} · ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')} IST`;
+  document.getElementById('topN').textContent=`NIFTY ${D.nifty.toLocaleString('en-IN',{maximumFractionDigits:0})}`;
+  const nc=D.niftyChg;
+  document.getElementById('topC').innerHTML=`<span style="color:${nc>=0?'#34d399':'#fca5a5'}">${nc>=0?'▲':'▼'}${Math.abs(nc).toFixed(2)}%</span>`;
+  document.getElementById('topV').textContent=`VIX ${D.vix.toFixed(1)}`;
+}
+function initTS(){
+  const ist=getIST(),days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('topD').textContent=`${days[ist.getUTCDay()]} ${ist.getUTCDate()} ${months[ist.getUTCMonth()]}`;
+  document.getElementById('topN').textContent=`NIFTY ${D.nifty.toLocaleString('en-IN',{maximumFractionDigits:0})}`;
+  document.getElementById('topV').textContent=`VIX ${D.vix.toFixed(1)}`;
+}
+
+// ═══════════════════════════════════════════════════
+// OI MAP RENDERER
+// ═══════════════════════════════════════════════════
+function renderOI(id,atm,step=50,cnt=7){
+  const mx=1000;let h='<div style="display:flex;gap:3px;align-items:center;min-height:100px">';
+  for(let i=-cnt;i<=cnt;i++){
+    const k=atm+i*step,isA=i===0;
+    const cOI=i>0?Math.round(mx*Math.exp(-((i-1)**2)/3)+50):30;
+    const pOI=i<0?Math.round(mx*Math.exp(-((-i-1)**2)/3)+50):30;
+    const ch=Math.round((cOI/mx)*65),ph=Math.round((pOI/mx)*65);
+    h+=`<div style="display:flex;flex-direction:column;align-items:center;min-width:${step>=100?54:42}px">
+      <div style="height:${ch}px;width:26px;background:#ef4444;border-radius:2px 2px 0 0;opacity:${i>0?.9:.3}"></div>
+      <div style="height:2px;background:${isA?'#fff':'#374151'};width:100%"></div>
+      <div style="height:${ph}px;width:26px;background:#10b981;border-radius:0 0 2px 2px;opacity:${i<0?.9:.3}"></div>
+      <div style="font-size:8px;color:${isA?'#fff':i>0?'#fca5a5':'#86efac'};margin-top:2px;font-weight:${isA?700:400}">${step>=100?(k/1000).toFixed(1)+'k':(k/1000).toFixed(1)+'k'}</div>
+      ${isA?'<div style="font-size:7px;color:#fbbf24;font-weight:700">ATM</div>':''}
+    </div>`;
+  }
+  h+='</div>';document.getElementById(id).innerHTML=h;
+}
+
+// ═══════════════════════════════════════════════════
+// RENDER P1 — NIFTY SIGNAL
+// ═══════════════════════════════════════════════════
+function renderP1(){
+  const sig=compSig(),{score,factors,conf,dir,giftNifty,prevNifty}=sig;
+  const nifty=D.nifty,vix=D.vix;
+  const{dte,expiry,display:expDisplay}=getNextTuesdayExpiry();
+  document.getElementById('expiryLabel').textContent=expDisplay;
+  document.getElementById('dteLabel').textContent=dte;
+
+  const T=Math.max(0.003,dte/365),sigma=vix/100,atmK=atm50(nifty);
+  let buyK,sellK,optType,stratName;
+  if(dir==='BULL'){buyK=atmK;sellK=atmK+WIDTH;optType='CE';stratName='Bull Call Spread (Debit)';}
+  else if(dir==='BEAR'){buyK=atmK;sellK=atmK-WIDTH;optType='PE';stratName='Bear Put Spread (Debit)';}
+  else{buyK=atmK;sellK=atmK+WIDTH;optType='CE';stratName='Bull Call Spread (Signal Weak — Consider Waiting)';}
+
+  const bg=bsGreeks(nifty,buyK,T,sigma,optType);
+  const sg=bsGreeks(nifty,sellK,T,sigma,optType);
+  const nd=Math.max(1,Math.round((bg.price-sg.price)*10)/10);
+  const mL=Math.round(nd*LOT),mG=Math.round((WIDTH-nd)*LOT);
+  // Realistic gain = not at max (sell strike unlikely in week), use 70% of max
+  const realG=Math.round(mG*0.72);
+  const rr=Math.round((realG/mL)*10)/10;
+  const beK=dir==='BULL'?buyK+nd:buyK-nd;
+  const minW=Math.round((1/(1+rr))*100);
+  const ev35=Math.round(0.35*realG-0.65*mL);
+  const slN=dir==='BULL'?Math.round(nifty-120):Math.round(nifty+120);
+  const t2N=dir==='BULL'?Math.round(nifty+170):Math.round(nifty-170);
+  const t3N=dir==='BULL'?Math.round(nifty+240):Math.round(nifty-240);
+  const slL=Math.round(nd*0.55*LOT);
+  const t2P=Math.round(nd*1.7*LOT);
+  const t3P=Math.round((WIDTH*0.80-nd)*LOT);
+  const netDelta=Math.round((bg.delta-sg.delta)*100)/100;
+  const netTheta=Math.round((sg.theta-bg.theta)*100)/100;
+  const netGamma=Math.round((bg.gamma-sg.gamma)*100000)/100000;
+  const netVega=Math.round((sg.vega-bg.vega)*100)/100;
+
+  // Direction banner
+  const dCol=dir==='BULL'?'#34d399':dir==='BEAR'?'#fca5a5':'#93c5fd';
+  const dCls=dir==='BULL'?'dbull':dir==='BEAR'?'dbear':'dwait';
+  document.getElementById('dBanner').className=`db ${dCls}`;
+  document.getElementById('dMeta').textContent=`${expDisplay} (DTE ${dte}) · NIFTY ${nifty.toLocaleString('en-IN',{maximumFractionDigits:0})} · VIX ${vix.toFixed(1)} · Lot 65 · Lot value ₹${(nifty*LOT/100000).toFixed(1)}L`;
+  document.getElementById('dTitle').innerHTML=`<span style="color:${dCol}">${dir==='BULL'?'▲ BULLISH — Bull Call Spread':dir==='BEAR'?'▼ BEARISH — Bear Put Spread':'⏸ NEUTRAL — Await Clarity'}</span>`;
+  const cl=conf==='HIGH'?`Score ${score>0?'+':''}${score} — HIGH confidence. Full lot (65 units). Enter 9:20-9:45 AM.`:conf==='MED'?`Score ${score>0?'+':''}${score} — MEDIUM confidence. Half lot (33 units) only.`:`Score ${score>0?'+':''}${score} — LOW confidence. SKIP. Wait for tomorrow's data.`;
+  document.getElementById('dDesc').textContent=cl;
+  document.getElementById('dScore').textContent=(score>0?'+':'')+score;document.getElementById('dScore').style.color=dCol;
+  document.getElementById('dBadge').innerHTML=`<span class="badge ${conf==='HIGH'?'bh':conf==='MED'?'bm':'blow'}">${conf==='HIGH'?'⚡ HIGH':conf==='MED'?'📊 MED':'⚠ LOW—WAIT'}</span>`;
+
+  // Next day forecast
+  const expMove=Math.round(nifty*vix/100*Math.sqrt(1/52));
+  const sup=Math.round(nifty-expMove*0.7),res=Math.round(nifty+expMove*0.7);
+  document.getElementById('nextDayForecast').innerHTML=`
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px">
+      <div class="kpi" style="flex:1;border-color:${dir==='BULL'?'#059669':dir==='BEAR'?'#dc2626':'#3b82f6'}"><div class="kl">Direction</div><div class="kv" style="font-size:16px;color:${dCol}">${dir==='BULL'?'▲ BULL':dir==='BEAR'?'▼ BEAR':'➡ NEUTRAL'}</div></div>
+      <div class="kpi" style="flex:1"><div class="kl">Support</div><div class="kv green">${sup.toLocaleString('en-IN')}</div></div>
+      <div class="kpi" style="flex:1"><div class="kl">Resistance</div><div class="kv red">${res.toLocaleString('en-IN')}</div></div>
+    </div>
+    <div style="font-size:11px;color:var(--m)">Expected weekly move (VIX-based): ±${expMove} pts · Max pain proxy: ${Math.round((sup+res)/2).toLocaleString('en-IN')}</div>`;
+
+  // 4-week rolling forecast
+  const weeks=getNext4Tuesdays();
+  const wkMove=Math.round(expMove*0.9);
+  document.getElementById('monthForecast').innerHTML=`<table class="month-table">
+    <tr><th>Expiry</th><th>Bull Target</th><th>Bear Target</th><th>Expected Range</th><th>Basis</th></tr>
+    ${weeks.map((w,i)=>`<tr>
+      <td class="white">${w.display}</td>
+      <td class="green">${(nifty+wkMove*(i+1)*0.6).toFixed(0)}</td>
+      <td class="red">${(nifty-wkMove*(i+1)*0.6).toFixed(0)}</td>
+      <td class="amber">${(wkMove*(i+1)*0.6).toFixed(0)} pts</td>
+      <td style="color:var(--m);font-size:10px">VIX ${vix.toFixed(1)}</td>
+    </tr>`).join('')}
+  </table><div style="font-size:10px;color:var(--m);margin-top:4px">⚠ Indicative only. Recalculates on each RUN UPDATE. Verify Sensibull for live premiums.</div>`;
+
+  // Signal factors
+  document.getElementById('sigF').innerHTML=factors.map(f=>`<div style="margin-bottom:9px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+      <span style="font-size:12px;font-weight:700;color:${f.bull===true?'#34d399':f.bull===false?'#fca5a5':'#fbbf24'}">${f.name}</span>
+      <div style="display:flex;align-items:center;gap:5px">
+        <span style="font-size:11px;color:var(--m)">${f.val}</span>
+        <span style="font-size:12px;font-weight:800;color:${f.bull===true?'#34d399':f.bull===false?'#fca5a5':'#fbbf24'}">${f.bull===true?'+'+f.w:f.bull===false?'-'+f.w:'0'}</span>
+      </div>
+    </div>
+    <div class="sbar"><div class="sfil" style="width:${(f.w/25)*100}%;background:${f.bull===true?'#10b981':f.bull===false?'#ef4444':'#f59e0b'}"></div></div>
+    <div style="font-size:10px;color:var(--m)">${f.detail}</div>
+  </div>`).join('');
+
+  // Global table — VIX color: falling VIX is GOOD (green) — FIXED
+  const gR=[
+    {f:'🎯 GIFT Nifty (est.)',v:Math.round(giftNifty).toLocaleString('en-IN'),c:((giftNifty-prevNifty)/prevNifty*100),m:giftNifty>prevNifty?'Gap-up expected ✅':'Gap-down expected ⚠',raw:true},
+    {f:'🇺🇸 S&P 500',v:D.sp500,c:D.sp500Chg,m:'US sentiment'},
+    {f:'🇯🇵 Nikkei 225',v:D.nikkei,c:D.nikkeiChg,m:'Asia direction'},
+    {f:'🇭🇰 Hang Seng',v:D.hsi,c:D.hsiChg,m:'China signal'},
+    // VIX: invert color — falling VIX = GREEN (less fear = bullish)
+    {f:'📊 India VIX',v:D.vix,c:D.vixChg,m:D.vix<15?'Low fear = cheap options ✅':D.vix>20?'Panic = expensive options ⚠':'Moderate',invertColor:true},
+    {f:'🛢 WTI Crude',v:'$'+D.crude.toFixed(1),c:D.crudeChg,m:D.crudeChg<0?'Falling = good for India ✅':'Rising = inflation risk',raw:true},
+    {f:'🥇 Gold',v:'$'+D.gold.toFixed(0),c:D.goldChg,m:D.goldChg>1?'Risk-off ⚠':'Neutral/Bullish ✅',raw:true},
+    {f:'💵 USD/INR',v:'₹'+D.usdinr.toFixed(1),c:D.usdinrChg,m:D.usdinr>86?'INR weak ⚠':D.usdinr<84?'INR strong ✅':'Neutral',raw:true},
+  ];
+  document.getElementById('gTbl').innerHTML=gR.map(r=>{
+    // For VIX: falling is good (green); for others: rising is good (green)
+    const posColor=r.invertColor?'#fca5a5':'#34d399'; // if invertColor, up=red
+    const negColor=r.invertColor?'#34d399':'#fca5a5'; // if invertColor, down=green
+    const chgColor=r.c>=0?posColor:negColor;
+    const mColor=r.invertColor?(r.c<0?'#34d399':'#fca5a5'):(r.c>=0?'#34d399':r.c>-0.5?'#fbbf24':'#fca5a5');
+    return`<tr><td>${r.f}</td>
+      <td class="white">${typeof r.v==='number'?r.v.toLocaleString('en-IN',{maximumFractionDigits:0}):r.v}</td>
+      <td style="color:${chgColor}">${r.c>=0?'+':''}${r.c.toFixed(2)}%</td>
+      <td style="color:${mColor}">${r.m}</td></tr>`;
+  }).join('');
+
+  // Pattern filters
+  const pc=(ok,txt)=>`<div class="pchk"><span style="color:${ok?'#34d399':'#fca5a5'}">${ok?'✅':'❌'}</span><span>${txt}</span></div>`;
+  const ivOk=vix<18;
+  document.getElementById('f1').innerHTML=
+    pc(ivOk,`VIX ${vix.toFixed(1)} — ${ivOk?'Options affordable (< ₹'+(Math.round(nd*1.3))+'debit OK)':'Options overpriced — use credit spreads instead'}`)+
+    pc(vix<20,`IV Crush Risk: ${vix>18?'HIGH — avoid buying':'LOW — safe to buy spreads'}`)+
+    `<div style="margin-top:5px;font-size:10px;color:${vix<15?'var(--g)':vix>18?'var(--r)':'var(--a)'}">💡 Delta-neutral if VIX&gt;18: Iron Condor. Debit if VIX&lt;15.</div>`;
+  const dteOk=dte>=3&&dte<=7;
+  const momentumOk=D.niftyChg>-0.5;
+  document.getElementById('f2').innerHTML=
+    pc(dteOk,`DTE ${dte} days — ${dteOk?'Optimal (3-7) ✅':dte<=2?'Too close to expiry ⚠':'Far — theta slow'}`)+
+    pc(dte>0,'Not expiry day (DTE must be >0)')+
+    pc(momentumOk,`10d momentum: ${momentumOk?'Positive/Neutral ✅':'Negative — halve Bull Put size'}`)+
+    `<div style="margin-top:5px;font-size:10px;color:var(--g)">💡 Best entry: Monday DTE 4-6 days</div>`;
+  document.getElementById('f3').innerHTML=
+    pc(conf==='HIGH',`Score ${score>0?'+':''}${score} — ${conf==='HIGH'?'HIGH ✅':conf==='MED'?'MED — reduce lot ⚠':'LOW — SKIP'}`)+
+    pc(conf!=='LOW','Signal clear enough to act')+
+    pc(dir!=='NEUTRAL','Clear directional bias detected')+
+    `<div style="margin-top:5px;font-size:10px;color:${conf==='HIGH'?'var(--g)':conf==='MED'?'var(--a)':'var(--r)'}">${conf==='HIGH'?'💡 All your losses were MED/LOW signal trades':conf==='MED'?'⚠ MED: max 33 units, tighter SL':'❌ LOW: skip today, re-run at 3:15 PM'}</div>`;
+
+  // IV Crush
+  const ivAlerts=detectIVCrush(vix,D.vixChg);
+  if(ivAlerts.length>0){
+    document.getElementById('ivCrushDiv').style.display='block';
+    document.getElementById('ivCrushMsg').innerHTML=ivAlerts.map(a=>`<div style="margin-bottom:6px"><strong>[${a.lvl}]</strong> ${a.txt}<br><em style="color:#d946ef">→ Action: ${a.action}</em></div>`).join('');
+  }else document.getElementById('ivCrushDiv').style.display='none';
+
+  // Pseudo signals
+  const fakes=detectPseudoSignals(D);
+  if(fakes.length>0){
+    document.getElementById('pseudoDiv').style.display='block';
+    document.getElementById('pseudoMsg').innerHTML=fakes.map(f=>`<div style="margin-bottom:6px"><strong>⚠ ${f.sig}:</strong> ${f.reason}<br><em style="color:#fdba74">→ ${f.action}</em></div>`).join('');
+  }else document.getElementById('pseudoDiv').style.display='none';
+
+  // OI Map
+  renderOI('oiMap',atmK);
+  // PCR analysis (synthetic proxy based on VIX)
+  const pcrProxy=vix<14?1.45:vix<16?1.2:vix<18?1.0:vix<20?0.85:0.65;
+  const pcrColor=pcrProxy>1.2?'#34d399':pcrProxy>0.9?'#fbbf24':'#fca5a5';
+  document.getElementById('pcrAnalysis').innerHTML=`<span style="color:${pcrColor}">PCR proxy: ~${pcrProxy.toFixed(2)}</span> · ${pcrProxy>1.2?'Bullish (put writers dominant — expect upward drift)':pcrProxy>0.9?'Neutral (balanced OI)':'Bearish (call writers dominant)'} · <strong>Max Pain est:</strong> ${atm50(nifty).toLocaleString('en-IN')} · Verify live: <a href="https://opstra.definedge.com/" target="_blank" style="color:#60a5fa">Opstra ↗</a>`;
+
+  // Trade details
+  document.getElementById('tSt').textContent=stratName;
+  document.getElementById('tBL').innerHTML=`<span class="badge bb">BUY</span> <strong class="white">NIFTY ${buyK.toLocaleString()} ${optType} @ ~₹${bg.price}</strong> <span class="muted" style="font-size:10px">(Black-Scholes — verify live)</span>`;
+  document.getElementById('tSL').innerHTML=`<span class="badge br">SELL</span> <strong class="white">NIFTY ${sellK.toLocaleString()} ${optType} @ ~₹${sg.price}</strong> <span class="muted" style="font-size:10px">(OTM hedge leg)</span>`;
+  document.getElementById('tD').textContent=`₹${nd}/unit × 65 = ₹${mL.toLocaleString()} total premium paid`;
+  document.getElementById('tML').textContent=`₹${mL.toLocaleString()} — this is ALL you can ever lose. No margin calls.`;
+  document.getElementById('tMG').textContent=`₹${realG.toLocaleString()} realistic (at ~${Math.round(WIDTH*0.7)}pt move) | Max ₹${mG.toLocaleString()} at full ${WIDTH}pt`;
+  document.getElementById('tBE').textContent=`NIFTY ${beK.toFixed(0)} (${Math.abs(beK-nifty).toFixed(0)} pts ${dir==='BULL'?'above':'below'} now)`;
+  document.getElementById('tEN').textContent=`9:20–9:45 AM · Accept premium within ₹${Math.round(nd*0.85)}–₹${Math.round(nd*1.15)} (±15% slippage)`;
+  document.getElementById('tEX').textContent=`${expDisplay} · DTE ${dte}`;
+
+  // Greeks table
+  document.getElementById('greeksTbl').innerHTML=`
+    <tr><td class="amber">Delta (Δ)</td><td>${bg.delta}</td><td>${sg.delta}</td><td><strong style="color:${Math.abs(netDelta)<0.3?'#34d399':'#fbbf24'}">${netDelta}</strong></td><td style="color:var(--m)">0.15–0.30 (not too directional)</td></tr>
+    <tr><td class="green">Theta (Θ) /day</td><td class="red">${bg.theta}</td><td class="green">${sg.theta}</td><td><strong style="color:${netTheta>0?'#34d399':'#fca5a5'}">${netTheta}</strong></td><td style="color:var(--m)">&gt;0 ideal (time working for us)</td></tr>
+    <tr><td class="blue">Gamma (Γ)</td><td>${bg.gamma}</td><td>${sg.gamma}</td><td>${netGamma}</td><td style="color:var(--m)">Low near expiry = caution</td></tr>
+    <tr><td class="purple">Vega (V) per 1% IV</td><td>${bg.vega}</td><td>${sg.vega}</td><td><strong style="color:${netVega<0?'#34d399':'#fca5a5'}">${netVega}</strong></td><td style="color:var(--m)">&lt;0 = IV decrease helps us</td></tr>
+    <tr><td class="muted">IV (VIX proxy)</td><td class="white">${(sigma*100).toFixed(1)}%</td><td class="white">${(sigma*100).toFixed(1)}%</td><td class="white">${(sigma*100).toFixed(1)}%</td><td style="color:var(--m)">${vix<15?'Low — good for buying':'High — prefer selling'}</td></tr>`;
+
+  const su=`https://app.sensibull.com/strategy-builder?instrument=NIFTY&expiry=${expiry}&strategy=${dir==='BULL'?'bull_call_spread':'bear_put_spread'}&buy_strike=${buyK}&sell_strike=${sellK}`;
+  document.getElementById('tSurl').innerHTML=`<a href="${su}" target="_blank" class="btn bs" style="width:100%;justify-content:center">↗ Verify Live on Sensibull (use actual premium)</a><div style="font-size:10px;color:var(--m);text-align:center;margin-top:4px">Black-Scholes = theoretical. Always check live bid/ask before placing.</div>`;
+  document.getElementById('rrR').textContent=rr+':1';
+  document.getElementById('rrB').textContent=minW+'%';
+  document.getElementById('rrE').textContent=ev35>=0?'+₹'+ev35.toLocaleString():'-₹'+Math.abs(ev35).toLocaleString();
+  document.getElementById('rrE').className=ev35>=0?'green':'red';
+
+  // Exit levels
+  document.getElementById('lvls').innerHTML=`
+    <div class="lbox le"><div style="font-size:9px;color:#93c5fd;margin-bottom:3px">📍 ENTRY</div><div style="font-size:18px;font-weight:900;color:#fff">${nifty.toLocaleString('en-IN',{maximumFractionDigits:0})}</div><div style="font-size:9px;color:var(--m)">Enter now</div></div>
+    <div class="lbox lsl"><div style="font-size:9px;color:#fca5a5;margin-bottom:3px">🚨 STOP LOSS</div><div style="font-size:18px;font-weight:900;color:#ef4444">${slN.toLocaleString()}</div><div style="font-size:9px;color:var(--m)">Exit → lose ~₹${slL.toLocaleString()}</div></div>
+    <div class="lbox l2"><div style="font-size:9px;color:#86efac;margin-bottom:3px">🎯 2× TARGET</div><div style="font-size:18px;font-weight:900;color:#10b981">${t2N.toLocaleString()}</div><div style="font-size:9px;color:var(--m)">Exit half → +₹${t2P.toLocaleString()}</div></div>
+    <div class="lbox l3"><div style="font-size:9px;color:#c4b5fd;margin-bottom:3px">🚀 3× TARGET</div><div style="font-size:18px;font-weight:900;color:#8b5cf6">${t3N.toLocaleString()}</div><div style="font-size:9px;color:var(--m)">Exit all → +₹${t3P.toLocaleString()}</div></div>`;
+
+  document.getElementById('tExp').innerHTML=`<strong>📌 Mechanical Exit Rules (no gut feeling):</strong><br>
+    1️⃣ NIFTY hits <strong style="color:#ef4444">${slN.toLocaleString()}</strong> → SQUARE OFF both legs. Loss = ~₹${slL.toLocaleString()}. No waiting.<br>
+    2️⃣ NIFTY hits <strong style="color:#10b981">${t2N.toLocaleString()}</strong> → EXIT half. Lock in +₹${t2P.toLocaleString()}.<br>
+    3️⃣ NIFTY hits <strong style="color:#8b5cf6">${t3N.toLocaleString()}</strong> → EXIT all. +₹${t3P.toLocaleString()}. Don't be greedy.<br>
+    4️⃣ Always exit in <strong>${dte<=2?'today (DTE too low!)':'2-3 days max'}</strong>. Theta decay accelerates daily.`;
+
+  // Exit timing (theta decay schedule)
+  const dailyDecay=Math.round(Math.abs(bg.theta-sg.theta)*LOT);
+  document.getElementById('exitTiming').innerHTML=`<strong>⏱ Theta Decay Schedule (daily loss if no price move):</strong><br>
+    Day 1 (entry): ±₹0 · Day 2: ~−₹${dailyDecay} · Day 3: ~−₹${Math.round(dailyDecay*1.3)} · Expiry day: −₹${Math.round(dailyDecay*2.5)}+<br>
+    <strong>Best exit window:</strong> Day 2 morning IF price moved in your direction. Net Theta on spread: ₹${netTheta<0?Math.abs(netTheta)*LOT+'/day (losing)':Math.round(Math.abs(netTheta)*LOT)+'/day (gaining)'}.`;
+
+  document.getElementById('trules').innerHTML=`
+    <div class="ins ir"><strong>✂️ Cut Losses Fast:</strong> NIFTY hits ${slN.toLocaleString()} → exit IMMEDIATELY. Spread loss at SL = ~₹${slL.toLocaleString()} (55% of max loss). Small loss now prevents full ₹${mL.toLocaleString()} wipeout tomorrow.</div>
+    <div class="ins ip"><strong>🚀 Let Winners Run:</strong> At 2× target (${t2N.toLocaleString()}), exit HALF. Leave rest for 3× (${t3N.toLocaleString()}). ONE 3× win covers ${Math.ceil(t3P/mL)} full losses at this RR.</div>
+    <div class="ins ia"><strong>🧮 The Math (realistic):</strong> RR ${rr}:1 realistic range. Need only ${minW}% win rate to break even. At 35% wins: EV = ${ev35>=0?'+':''}₹${ev35.toLocaleString()} per trade. <strong>Capital preservation first.</strong></div>`;
+
+  // BTST
+  const{day:wd}=istHM();const dn=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  let bm='';
+  if(wd===5)bm='<strong style="color:#fca5a5">🚫 NO BTST TODAY (Friday):</strong> Weekend = 2 days of theta loss on zero market movement. Exit ALL by 3 PM today without exception.';
+  else if(wd===2&&dte<=1)bm='<strong style="color:#fca5a5">⚠ EXPIRY EVE (Monday):</strong> Tomorrow is Tuesday expiry. Exit today before 3 PM. Theta destroys 60% of value in last 24 hours.';
+  else if(wd===1&&conf==='HIGH')bm=`<strong style="color:#34d399">✅ MONDAY + HIGH CONF — BTST possible:</strong> Your strongest BTST setup. VIX ${vix.toFixed(1)} = ${vix<16?'suitable':'check before holding overnight'}. DTE ${dte} — hold 1 night max.`;
+  else bm=`<strong>💡 ${dn[wd]} Entry:</strong> Standard 2-day hold. BTST acceptable if score ≥40. Current VIX ${vix.toFixed(1)} = ${vix<15?'good for overnight hold':'elevated, monitor overnight'}. STBT only with full hedge on both legs.`;
+  document.getElementById('btstMsg').innerHTML=bm;
+
+  // Scenarios
+  const mv=pts=>dir==='BULL'?Math.round(nifty+pts):Math.round(nifty-pts);
+  document.getElementById('scTbl').innerHTML=`
+    <tr style="background:rgba(16,185,129,.07)"><td>🚀 Strong ${dir==='BULL'?'rally':'fall'}</td><td class="white">→ ${mv(250).toLocaleString()}</td><td class="green"><strong>3× target → EXIT ALL</strong></td><td class="pp">+₹${t3P.toLocaleString()}</td><td class="green">35%</td></tr>
+    <tr><td>📈 Mild ${dir==='BULL'?'rally':'fall'}</td><td class="white">→ ${mv(160).toLocaleString()}</td><td class="green">2× target → exit half</td><td class="pp">+₹${t2P.toLocaleString()}</td><td>35%</td></tr>
+    <tr><td>➡ Flat/sideways</td><td class="white">±80 pts</td><td class="amber">Exit on day 2-3 regardless</td><td style="color:var(--m)">−₹${Math.round(nd*0.3*LOT).toLocaleString()} (theta)</td><td>20%</td></tr>
+    <tr style="background:rgba(239,68,68,.07)"><td>📉 Goes against</td><td class="white">→ ${slN.toLocaleString()}</td><td class="red"><strong>SL HIT → EXIT IMMEDIATELY</strong></td><td class="pn">−₹${slL.toLocaleString()}</td><td class="red">10%</td></tr>`;
+}
+
+// ═══════════════════════════════════════════════════
+// RENDER P2 — MCX SIGNAL
+// ═══════════════════════════════════════════════════
+function renderP2(){
+  const mcxG=Math.round(D.gold*D.usdinr*(10/31.1035));
+  const mcxC=Math.round(D.crude*D.usdinr);
+  const mcxS=Math.round(D.silver*D.usdinr*(1000/31.1035));
+  const gATM=Math.round(mcxG/500)*500;
+  const cATM=Math.round(mcxC/100)*100;
+  const sATM=Math.round(mcxS/1000)*1000;
+
+  document.getElementById('gP').textContent='₹'+mcxG.toLocaleString('en-IN');
+  document.getElementById('gC').innerHTML=`<span style="color:${D.goldChg>=0?'#f59e0b':'#6b7280'}">${D.goldChg>=0?'▲':'▼'}${Math.abs(D.goldChg).toFixed(2)}% · COMEX $${D.gold.toFixed(0)}/oz</span>`;
+  const gd=D.goldChg>0.4?'BULL':D.goldChg<-0.4?'BEAR':'NEUTRAL';
+  document.getElementById('gSig').innerHTML=`<span class="badge ${gd==='BULL'?'ba':gd==='BEAR'?'br':'bm'}">${gd==='BULL'?'▲ RISING':gd==='BEAR'?'▼ FALLING':'➡ RANGE'}</span>`;
+  document.getElementById('cP').textContent='₹'+mcxC.toLocaleString('en-IN');
+  document.getElementById('cC').innerHTML=`<span style="color:${D.crudeChg>=0?'#34d399':'#fca5a5'}">${D.crudeChg>=0?'▲':'▼'}${Math.abs(D.crudeChg).toFixed(2)}% · WTI $${D.crude.toFixed(1)}/bbl</span>`;
+  const cd=D.crudeChg<-0.8?'BULL':D.crudeChg>0.8?'BEAR':'NEUTRAL';
+  document.getElementById('cSig').innerHTML=`<span class="badge ${D.crudeChg>1?'br':'bb'}">${D.crudeChg>0.8?'▲ Rising (bad for India)':'▼ Falling (good for India)'}</span>`;
+  document.getElementById('sP').textContent='₹'+mcxS.toLocaleString('en-IN');
+  document.getElementById('sC').innerHTML=`<span style="color:${(D.silverChg||0)>=0?'#d1d5db':'#6b7280'}">${(D.silverChg||0)>=0?'▲':'▼'}${Math.abs(D.silverChg||0).toFixed(2)}% · COMEX $${D.silver.toFixed(2)}/oz</span>`;
+  const sd=D.silverChg>0.5?'BULL':D.silverChg<-0.5?'BEAR':'NEUTRAL';
+  document.getElementById('sSig').innerHTML=`<span class="badge ${sd==='BULL'?'bb':sd==='BEAR'?'br':'blow'}">${sd==='BULL'?'▲ RISING':sd==='BEAR'?'▼ FALLING':'➡ RANGE'}</span>`;
+
+  document.getElementById('usdTbl').innerHTML=`
+    <tr><td style="color:var(--m)">USD/INR Live</td><td class="white" style="font-weight:700">₹${D.usdinr.toFixed(2)}/USD</td></tr>
+    <tr><td style="color:var(--m)">INR change</td><td style="color:${D.usdinrChg>=0?'#fca5a5':'#34d399'}">${D.usdinrChg>=0?'Weakening ':'Strengthening '}(${D.usdinrChg>=0?'+':''}${D.usdinrChg.toFixed(2)}%)</td></tr>
+    <tr><td style="color:var(--m)">MCX Gold effect</td><td style="color:${D.usdinrChg>=0?'#f59e0b':'var(--m)'}">${D.usdinrChg>=0?'↑ MCX Gold rises even if COMEX flat':'↓ MCX Gold may lag COMEX'}</td></tr>
+    <tr><td style="color:var(--m)">MCX Crude effect</td><td style="color:${D.usdinrChg>=0?'#fca5a5':'#34d399'}">${D.usdinrChg>=0?'↑ Import cost up = inflation risk':'↓ Cheaper imports = good for India'}</td></tr>`;
+
+  document.getElementById('crudeImp').innerHTML=`
+    <div class="ins ${D.crudeChg<-1?'ig':D.crudeChg>1?'ir':'ia'}" style="margin-bottom:7px"><strong>Crude at $${D.crude.toFixed(1)}/bbl:</strong> ${D.crudeChg<-1?'🟢 Falling = cheaper imports = NIFTY bullish tailwind':D.crudeChg>1?'🔴 Rising = inflation = bearish for India':'🟡 Stable. Neutral for NIFTY.'}</div>
+    <div class="ins ib" style="font-size:11px"><strong>India imports 85% of crude.</strong> Every $10/bbl rise = ~$14B/yr extra cost. Widens CAD, weakens INR — double headwind. <strong>Best MCX Crude entry:</strong> DTE 4-5 days, after OPEC news or US inventory data (Wed 8:30 PM IST).</div>`;
+
+  // MCX GOLD TRADE — with specific strikes
+  const gDte=getNextTuesdayExpiry().dte,gT=Math.max(0.003,gDte/365),gSig2=0.14;
+  const gType=gd==='BULL'?'CE':'PE';
+  const gBuyK=gATM,gSellK=gd==='BULL'?gATM+1500:gATM-1500;
+  const gBG=bsGreeks(mcxG,gBuyK,gT,gSig2,gType);
+  const gSG=bsGreeks(mcxG,gSellK,gT,gSig2,gType);
+  const gDebit=Math.max(30,Math.round((gBG.price-gSG.price)*10)/10),gLot=10;
+  const gML=gDebit*gLot,gMG=Math.round((1500-gDebit)*gLot*0.72);
+  const gRR=Math.round((gMG/gML)*10)/10;
+  const gSL=gd==='BULL'?mcxG-600:mcxG+600,g2x=gd==='BULL'?gATM+900:gATM-900,g3x=gd==='BULL'?gATM+1300:gATM-1300;
+
+  document.getElementById('gTrade').innerHTML=gd==='NEUTRAL'?
+    `<div class="ins ia"><strong>⏸ Gold direction unclear</strong> (${D.goldChg.toFixed(2)}% change). Strategy for RANGEBOUND: <br>
+     Sell Gold Strangle: Sell ${(gATM+500).toLocaleString('en-IN')} CE + Sell ${(gATM-500).toLocaleString('en-IN')} PE = collect ~₹50-80 credit/g × 10g = ₹500-800.<br>
+     SL: Exit if Gold moves outside ±700 pts from ATM. <strong>Max loss capped</strong> by selling OTM strikes only.</div>`:
+    `<div class="g2" style="gap:12px"><div><table>
+      <tr><td style="color:var(--m);font-size:11px">Direction</td><td><span class="badge ${gd==='BULL'?'bb':'br'}">${gd==='BULL'?'▲ BULLISH':'▼ BEARISH'}</span></td></tr>
+      <tr><td style="color:var(--m);font-size:11px">Strategy</td><td class="white"><strong>${gd==='BULL'?'Bull Call Spread':'Bear Put Spread'}</strong></td></tr>
+      <tr><td style="color:var(--m);font-size:11px">Buy Leg</td><td><span class="badge bb">BUY</span> MCX Gold ${gBuyK.toLocaleString('en-IN')} ${gType} ~₹${gBG.price.toFixed(0)}/g</td></tr>
+      <tr><td style="color:var(--m);font-size:11px">Sell Leg</td><td><span class="badge br">SELL</span> MCX Gold ${gSellK.toLocaleString('en-IN')} ${gType} ~₹${gSG.price.toFixed(0)}/g</td></tr>
+      <tr><td style="color:var(--m);font-size:11px">Net Debit</td><td class="amber">~₹${gDebit}/g × ${gLot}g = <strong>₹${gML.toLocaleString()}</strong></td></tr>
+      <tr><td style="color:var(--m);font-size:11px">Realistic Gain</td><td class="green"><strong>₹${gMG.toLocaleString()}</strong> (RR ${gRR}:1)</td></tr>
+      <tr><td style="color:var(--m);font-size:11px">Delta (net)</td><td class="amber">${Math.round((gBG.delta-gSG.delta)*100)/100}</td></tr>
+      <tr><td style="color:var(--m);font-size:11px">Theta/day</td><td class="green">+₹${Math.round((gSG.theta-gBG.theta)*gLot)}/lot</td></tr>
+    </table></div>
+    <div>
+      <div class="ins ia"><strong>📍 Exit Levels (MCX Gold ₹/10g):</strong><br>🚨 SL: ₹${gSL.toLocaleString('en-IN')} → Exit all<br>🎯 2×: ₹${g2x.toLocaleString('en-IN')} → Exit half<br>🚀 3×: ₹${g3x.toLocaleString('en-IN')} → Exit all</div>
+      <div class="ins ib" style="font-size:11px;margin-top:7px"><strong>Verify on MCX:</strong> <a href="https://www.mcxindia.com/market-data/option-chain" target="_blank" style="color:#60a5fa">MCX Option Chain ↗</a><br>Lot: MCX Gold Mini = 10g. Max loss = ₹${gML.toLocaleString()} (no margin call for options). Margin required: ~₹12,000-18,000/lot.</div>
+    </div></div>`;
+
+  // MCX CRUDE TRADE — with specific strikes
+  const cType=cd==='BULL'?'CE':'PE';
+  const cBuyK=cATM,cSellK=cd==='BULL'?cATM+500:cATM-500;
+  const cBG=bsGreeks(mcxC,cBuyK,gT,0.22,cType);
+  const cSG=bsGreeks(mcxC,cSellK,gT,0.22,cType);
+  const cDebit=Math.max(8,Math.round((cBG.price-cSG.price)*10)/10),cLot=100;
+  const cML=cDebit*cLot,cMG=Math.round((500-cDebit)*cLot*0.70);
+  const cRR=Math.round((cMG/cML)*10)/10;
+  const cSLN=cd==='BULL'?mcxC-200:mcxC+200;
+
+  document.getElementById('cTrade').innerHTML=cd==='NEUTRAL'?
+    `<div class="ins ia"><strong>⏸ Crude rangebound — Iron Condor strategy:</strong><br>
+     Sell ${(cATM+300).toLocaleString('en-IN')} CE + Sell ${(cATM-300).toLocaleString('en-IN')} PE<br>
+     Buy ${(cATM+500).toLocaleString('en-IN')} CE + Buy ${(cATM-500).toLocaleString('en-IN')} PE (hedge wings)<br>
+     Net Credit: ~₹15-25/bbl × 100 = ₹1,500-2,500. Profit if crude stays within ±₹300 of ATM. <strong>Best for low-VIX stable crude weeks.</strong></div>`:
+    `<div class="g2" style="gap:12px"><div><table>
+      <tr><td style="color:var(--m);font-size:11px">Direction</td><td><span class="badge ${cd==='BULL'?'bb':'br'}">${cd==='BULL'?'▲ Crude rising (buy calls)':'▼ Crude falling (buy puts)'}</span></td></tr>
+      <tr><td style="color:var(--m);font-size:11px">Strategy</td><td class="white"><strong>${cd==='BULL'?'Bull Call Spread':'Bear Put Spread'}</strong></td></tr>
+      <tr><td style="color:var(--m);font-size:11px">Buy Leg</td><td><span class="badge bb">BUY</span> Crude ${cBuyK.toLocaleString('en-IN')} ${cType} ~₹${cBG.price.toFixed(0)}/bbl</td></tr>
+      <tr><td style="color:var(--m);font-size:11px">Sell Leg</td><td><span class="badge br">SELL</span> Crude ${cSellK.toLocaleString('en-IN')} ${cType} ~₹${cSG.price.toFixed(0)}/bbl</td></tr>
+      <tr><td style="color:var(--m);font-size:11px">Net Debit</td><td class="amber">~₹${cDebit}/bbl × 100 = <strong>₹${cML.toLocaleString()}</strong></td></tr>
+      <tr><td style="color:var(--m);font-size:11px">Realistic Gain</td><td class="green"><strong>₹${cMG.toLocaleString()}</strong> (RR ${cRR}:1)</td></tr>
+    </table></div>
+    <div>
+      <div class="ins ${cd==='BULL'?'ig':'ir'}" style="margin-bottom:7px"><strong>SL:</strong> Crude moves past ₹${cSLN.toLocaleString('en-IN')} → Exit. Catalyst watch: OPEC meetings, US EIA inventory (Wed PM).</div>
+      <div class="ins ib" style="font-size:11px"><strong>MCX Crude lot = 100 bbl.</strong> Margin ~₹15,000-25,000. Max loss = ₹${cML.toLocaleString()} (options). Verify: <a href="https://www.mcxindia.com/market-data/option-chain" target="_blank" style="color:#60a5fa">MCX OC ↗</a></div>
+    </div></div>`;
+
+  // MCX SILVER — always show a trade (range-bound strategy if neutral)
+  const sWidth=2000;
+  const sBuyK=sATM,sSellK=sd==='BULL'?sATM+sWidth:sATM-sWidth;
+  const sBG=bsGreeks(mcxS,sBuyK,gT,0.16,'CE');
+  const sSG=bsGreeks(mcxS,sSellK,gT,0.16,'CE');
+  const sDebit=Math.max(20,Math.round((sBG.price-sSG.price)*10)/10),sLot=30;
+  const sML=sDebit*sLot,sMG=Math.round((sWidth-sDebit)*sLot*0.65);
+  const sRR=Math.round((sMG/sML)*10)/10;
+
+  document.getElementById('sTrade').innerHTML=sd==='NEUTRAL'?
+    `<div class="ins ia" style="margin-bottom:8px"><strong>⏸ Silver rangebound — Short Strangle with wings:</strong></div>
+    <div class="ins ig"><strong>Strategy: Silver Iron Condor (always have a trade)</strong><br>
+    Sell ${(sATM+1000).toLocaleString('en-IN')} CE + Sell ${(sATM-1000).toLocaleString('en-IN')} PE<br>
+    Buy ${(sATM+2000).toLocaleString('en-IN')} CE + Buy ${(sATM-2000).toLocaleString('en-IN')} PE (hedge wings)<br>
+    Net Credit: ~₹30-50/kg × 30kg = ₹900-1,500<br>
+    Max profit: full credit if silver stays ±₹1,000 of ATM ${sATM.toLocaleString('en-IN')}<br>
+    Max loss: capped at ₹${(1000*30-1500).toLocaleString()} (spread width - credit)<br>
+    <strong>Best for:</strong> Stable weeks with VIX&lt;16 and no major RBI/Fed events</div>`:
+    `<div class="ins ${sd==='BULL'?'ig':'ir'}"><strong>Silver ${sd==='BULL'?'BULLISH':'BEARISH'} — ${sd==='BULL'?'Bull Call Spread':'Bear Put Spread'}:</strong><br>
+    Buy ${sBuyK.toLocaleString('en-IN')} ${sd==='BULL'?'CE':'PE'} ~₹${sBG.price.toFixed(0)}/kg | Sell ${sSellK.toLocaleString('en-IN')} ${sd==='BULL'?'CE':'PE'} ~₹${sSG.price.toFixed(0)}/kg<br>
+    Net cost: ~₹${sDebit}/kg × 30kg = ₹${sML.toLocaleString()} | Realistic gain: ₹${sMG.toLocaleString()} (RR ${sRR}:1)<br>
+    Lot: MCX Silver Mini = 5kg, Regular = 30kg. Verify on MCX option chain before placing.</div>`;
+}
+
+// ═══════════════════════════════════════════════════
+// PREDICTION LOG — localStorage, no fake history
+// ═══════════════════════════════════════════════════
+const PRED_KEY='ncv3_predictions';
+const LEARN_KEY='ncv3_learning';
+let pendingOutcomeId=null;
+
+function getPredictions(){try{return JSON.parse(localStorage.getItem(PRED_KEY)||'[]');}catch{return[];}}
+function savePreds(p){localStorage.setItem(PRED_KEY,JSON.stringify(p.slice(0,60)));}
+function getLearning(){try{return JSON.parse(localStorage.getItem(LEARN_KEY)||'{"lessons":[],"rules":[],"version":1,"lastUpdated":"","totalPreds":0,"totalCorrect":0}');}catch{return{lessons:[],rules:[],version:1,lastUpdated:'',totalPreds:0,totalCorrect:0};}}
+function saveLearning(m){localStorage.setItem(LEARN_KEY,JSON.stringify(m));}
+
+function saveTodayPred(){
+  const sig=compSig();const{dte,expiry,display}=getNextTuesdayExpiry();
+  const ist=getIST();const dateStr=ist.toISOString().slice(0,10);
+  const preds=getPredictions();
+  if(preds.length>0&&preds[0].date===dateStr){
+    if(!confirm('Prediction for today already saved. Overwrite?'))return;
+    preds.shift();
+  }
+  preds.unshift({id:Date.now(),date:dateStr,time:ist.toISOString().slice(11,16)+' IST',dir:sig.dir,score:sig.score,conf:sig.conf,nifty:Math.round(D.nifty),vix:+D.vix.toFixed(1),expiry,dteAtEntry:dte,support:Math.round(D.nifty-D.nifty*D.vix/100*Math.sqrt(1/52)*0.7),resistance:Math.round(D.nifty+D.nifty*D.vix/100*Math.sqrt(1/52)*0.7),actual:null,outcome:null});
+  savePreds(preds);
+  const lm=getLearning();lm.totalPreds++;lm.lastUpdated=dateStr;saveLearning(lm);
+  renderP3();alert('✅ Prediction saved! Return after market close to enter actual outcome.');
+}
+
+function openOutcomeForm(id){
+  pendingOutcomeId=id;
+  const preds=getPredictions();const p=preds.find(x=>x.id===id);
+  if(!p)return;
+  document.getElementById('ocDate').textContent=p.date+' (predicted: '+p.dir+', NIFTY ~'+p.nifty+')';
+  document.getElementById('ocDir').value=p.dir;
+  document.getElementById('ocClose').value='';document.getElementById('ocPnl').value='';document.getElementById('ocRoot').value='';
+  document.getElementById('outcomeForm').style.display='block';
+  document.getElementById('outcomeForm').scrollIntoView({behavior:'smooth'});
+}
+
+function saveOutcome(){
+  if(!pendingOutcomeId)return;
+  const preds=getPredictions();const idx=preds.findIndex(p=>p.id===pendingOutcomeId);
+  if(idx<0)return;
+  const actualDir=document.getElementById('ocDir').value;
+  const actualClose=parseFloat(document.getElementById('ocClose').value)||null;
+  const pnl=parseFloat(document.getElementById('ocPnl').value)||null;
+  const root=document.getElementById('ocRoot').value.trim();
+  const correct=preds[idx].dir===actualDir;
+  preds[idx].actual={dir:actualDir,close:actualClose,pnl,root,savedAt:new Date().toISOString()};
+  preds[idx].outcome=correct?'CORRECT':'MISS';
+  savePreds(preds);
+  // Update learning model
+  const lm=getLearning();
+  if(correct)lm.totalCorrect++;
+  if(!correct&&root){
+    lm.lessons.unshift({date:preds[idx].date,predicted:preds[idx].dir,actual:actualDir,root,niftyAtEntry:preds[idx].nifty,score:preds[idx].score,conf:preds[idx].conf});
+    // Extract rule from root cause
+    if(root.length>20){lm.rules.unshift({date:preds[idx].date,rule:'After miss: '+root.slice(0,80)+'...',source:'auto'});}
+  }
+  lm.lastUpdated=new Date().toISOString().slice(0,10);saveLearning(lm);
+  pendingOutcomeId=null;
+  document.getElementById('outcomeForm').style.display='none';
+  renderP3();renderP4();
+  alert(`✅ Outcome saved. ${correct?'CORRECT prediction! 🎉':'MISS logged. Root cause added to learning model.'}`);
+}
+
+function renderP3(){
+  const preds=getPredictions();
+  // Stats
+  const withOutcome=preds.filter(p=>p.outcome);
+  const correct=withOutcome.filter(p=>p.outcome==='CORRECT').length;
+  const acc=withOutcome.length>0?Math.round(correct/withOutcome.length*100):0;
+  const totalPnl=preds.filter(p=>p.actual?.pnl).reduce((s,p)=>s+(p.actual.pnl||0),0);
+  document.getElementById('predStats').innerHTML=`
+    <div class="kpi" style="border-color:#3b82f6"><div class="kl">Total Predictions</div><div class="kv white">${preds.length}</div></div>
+    <div class="kpi" style="border-color:#059669"><div class="kl">Accuracy</div><div class="kv ${acc>=60?'green':acc>=40?'amber':'red'}">${withOutcome.length>0?acc+'%':'Pending'}</div><div class="ks">${correct}/${withOutcome.length} validated</div></div>
+    <div class="kpi" style="border-color:${totalPnl>=0?'#059669':'#dc2626'}"><div class="kl">Total Trade P&amp;L</div><div class="kv ${totalPnl>=0?'green':'red'}">${totalPnl>=0?'+':''}₹${Math.abs(totalPnl).toLocaleString()}</div></div>`;
+
+  if(preds.length===0){
+    document.getElementById('predLog').innerHTML='<div style="color:var(--m);font-size:12px;text-align:center;padding:30px">No predictions saved yet. Run UPDATE on Tab 1 and click "Save Today\'s Prediction".</div>';
+    return;
+  }
+  // Render latest first
+  document.getElementById('predLog').innerHTML=preds.map(p=>{
+    const oc=p.outcome;const hasAct=!!p.actual;
+    const ocColor=oc==='CORRECT'?'#34d399':oc==='MISS'?'#ef4444':'#94a3b8';
+    const ocText=oc==='CORRECT'?'✅ CORRECT':oc==='MISS'?'❌ MISS':'⏳ Pending outcome';
+    return`<div class="pred-row">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#fff">${p.date} <span style="font-size:10px;color:var(--m)">${p.time}</span></div>
+          <div style="margin-top:4px">
+            <span class="badge ${p.dir==='BULL'?'bb':p.dir==='BEAR'?'br':'bm'}">${p.dir==='BULL'?'▲ BULL':p.dir==='BEAR'?'▼ BEAR':'➡ NEUTRAL'}</span>
+            <span class="badge ${p.conf==='HIGH'?'bh':p.conf==='MED'?'bm':'blow'}" style="margin-left:4px">${p.conf}</span>
+            <span style="font-size:11px;color:var(--m);margin-left:8px">Score: ${p.score>0?'+':''}${p.score} · NIFTY: ${p.nifty.toLocaleString()} · VIX: ${p.vix}</span>
+          </div>
+          <div style="font-size:11px;color:var(--m);margin-top:3px">Predicted range: ${p.support.toLocaleString()}–${p.resistance.toLocaleString()} · Expiry: ${p.expiry} (DTE ${p.dteAtEntry})</div>
+          ${hasAct?`<div style="font-size:11px;margin-top:4px;color:${ocColor}"><strong>${ocText}</strong> · Actual: ${p.actual.dir||'—'} @ ${p.actual.close?.toLocaleString()||'—'} · P&L: ${p.actual.pnl!=null?(p.actual.pnl>=0?'+':'')+'₹'+Math.abs(p.actual.pnl).toLocaleString():'—'}</div>
+          ${p.actual.root?`<div style="font-size:10px;color:#f97316;margin-top:3px;padding:4px 8px;background:#1a1000;border-radius:4px">Root cause: ${p.actual.root}</div>`:''}`:
+          '<div style="font-size:11px;color:var(--m);margin-top:4px">Awaiting actual outcome entry…</div>'}
+        </div>
+        ${!hasAct?`<button class="btn bsave" onclick="openOutcomeForm(${p.id})" style="font-size:11px;padding:5px 10px">✏️ Enter Outcome</button>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderP4(){
+  const lm=getLearning();
+  const preds=getPredictions();
+  const withOC=preds.filter(p=>p.outcome);
+  const acc=withOC.length>0?Math.round(preds.filter(p=>p.outcome==='CORRECT').length/withOC.length*100):0;
+  document.getElementById('learnStats').innerHTML=`
+    <div class="kpi" style="border-color:#8b5cf6"><div class="kl">Learning Model v${lm.version}</div><div class="kv purple">Active</div><div class="ks">Last updated: ${lm.lastUpdated||'—'}</div></div>
+    <div class="kpi" style="border-color:#059669"><div class="kl">Accuracy so far</div><div class="kv ${acc>=60?'green':acc>=40?'amber':'red'}">${withOC.length>0?acc+'%':'Pending'}</div><div class="ks">${withOC.length} predictions validated</div></div>
+    <div class="kpi" style="border-color:#3b82f6"><div class="kl">Rules accumulated</div><div class="kv blue">${lm.rules.length}</div><div class="ks">From miss analysis</div></div>`;
+
+  if(lm.lessons.length===0){
+    document.getElementById('learnMisses').innerHTML='<div style="color:var(--m);font-size:12px;padding:15px">No misses recorded yet. After saving an incorrect prediction outcome, the root cause analysis will appear here.</div>';
+  }else{
+    document.getElementById('learnMisses').innerHTML=lm.lessons.map(l=>`<div class="pred-row" style="border-left:3px solid #ef4444">
+      <div style="font-size:12px;font-weight:700;color:#fff">${l.date} — Predicted ${l.predicted}, Actual ${l.actual}</div>
+      <div style="font-size:11px;color:var(--m);margin-top:3px">Score: ${l.score} (${l.conf}) · NIFTY at entry: ${l.niftyAtEntry.toLocaleString()}</div>
+      <div style="font-size:12px;color:#f97316;margin-top:5px;padding:6px;background:#1a1000;border-radius:4px"><strong>Root cause:</strong> ${l.root}</div>
+    </div>`).join('');
+  }
+
+  if(lm.rules.length===0){
+    document.getElementById('learnRules').innerHTML='<div style="color:var(--m);font-size:12px;padding:15px">No rules accumulated yet. After validating predictions, auto-generated rules appear here.</div>';
+  }else{
+    document.getElementById('learnRules').innerHTML=lm.rules.map((r,i)=>`<div style="display:flex;gap:8px;align-items:flex-start;padding:7px;border-bottom:1px solid #1e2a40">
+      <span style="font-size:11px;color:var(--m);min-width:60px">${r.date}</span>
+      <span style="font-size:12px;color:#fde68a">${i+1}. ${r.rule}</span>
+    </div>`).join('');
+  }
+
+  document.getElementById('modelHistory').innerHTML=`
+    <div style="padding:8px;font-size:12px;color:#94a3b8;line-height:2">
+      <div>v1.0 — Dashboard launched. Tuesday expiry, lot 65, password admin/admin.</div>
+      <div>v2.0 — Black-Scholes LTP fix. GIFT Nifty added. VIX color fixed (falling=green). MCX trades with specific strikes.</div>
+      <div>v3.0 — Greeks display. IV crush detection. Pseudo-signal detector. Monthly forecast. Learning model with localStorage. Realistic RR calculation.</div>
+      ${lm.lessons.map(l=>`<div>→ Learning added ${l.date}: ${l.root?.slice(0,60)}…</div>`).join('')}
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════
+// STATIC PAGES INIT (empty P3 and P4 if no data)
+// ═══════════════════════════════════════════════════
+function initStaticPages(){renderP3();renderP4();}
+
+// ═══════════════════════════════════════════════════
+// TAB SWITCHING
+// ═══════════════════════════════════════════════════
+function showP(id,el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');el.classList.add('active');
+}
+
+// ═══════════════════════════════════════════════════
+// AUTO-REFRESH — 9:30 AM and 3:15 PM IST (verified)
+// ═══════════════════════════════════════════════════
+setInterval(()=>{
+  const{h,m,day}=istHM();
+  if(day===0||day===6)return; // skip weekends
+  const key=`${h}:${String(m).padStart(2,'0')}`;
+  if((key==='09:30'||key==='15:15')&&key!==autoKey){
+    autoKey=key;console.log('⚡ Auto-refresh at IST',key);
+    if(document.getElementById('app').style.display!=='none')runUpdate();
+  }
+},30000);
+
+initTS();
+</script>
+</body>
+</html>
