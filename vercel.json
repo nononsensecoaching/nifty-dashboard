@@ -1,5 +1,5 @@
 {
-    "routes": [
-          { "src": "/(.*)", "dest": "/nifty_command_centre_v2.html" }
-    ]
+      "routes": [
+              { "src": "/(.*)", "dest": "/nifty_command_centre_v3.html" }
+      ]
 }
