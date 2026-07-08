@@ -1634,7 +1634,7 @@ function renderP3(){
           <div style="font-size:11px;color:var(--m);margin-top:3px">Predicted range: ${p.support.toLocaleString()}–${p.resistance.toLocaleString()} · Expiry: ${p.expiry} (DTE ${p.dteAtEntry})</div>
           ${hasAct?`<div style="font-size:11px;margin-top:4px;color:${ocColor}"><strong>${ocText}</strong> · Actual: ${p.actual.dir||'—'} @ ${p.actual.close?.toLocaleString()||'—'} · P&L: ${p.actual.pnl!=null?(p.actual.pnl>=0?'+':'')+'₹'+Math.abs(p.actual.pnl).toLocaleString():'—'}</div>
           ${p.actual.root?`<div style="font-size:10px;color:#f97316;margin-top:3px;padding:4px 8px;background:#1a1000;border-radius:4px">Root cause: ${p.actual.root}</div>`:''}`:
-          (()=>{var hm=istHM();var cl=hm.day>0&&hm.day<6&&(hm.h>15||(hm.h===15&&hm.m>=30));if(cl)return '<div style="font-size:11px;color:#f59e0b;margin-top:4px">Market Closed - Enter outcome now.</div>';return '<div style="font-size:11px;color:var(--m);margin-top:4px">Market open - outcome entry after 3:30 PM IST</div>';})() 
+          '<div style="font-size:11px;color:var(--m);margin-top:4px">&#x23F3; Awaiting outcome — enter after 3:30 PM IST</div>'}
         </div>
         ${!hasAct?`<button class="btn bsave" onclick="openOutcomeForm(${p.id})" style="font-size:11px;padding:5px 10px">✏️ Enter Outcome</button>`:''}
       </div>
@@ -3098,9 +3098,6 @@ function renderChart(metrics){
 
   // ── DOUBLE-CLICK to reset range ──
   svg.addEventListener('dblclick',()=>{ resetChartRange(); });
-}
-
-
 }
 
 function renderLegsTape(){
